@@ -10,6 +10,11 @@ Setup, auth, tenant, ciclo comercial e o CRUD de referencia carga JA
 EXISTEM e funcionam (back e front). Modulo novo se faz COPIANDO a estrutura de
 features/carga - nao recriar o que ja esta pronto.
 
+Comandos de desenvolvimento:
+- docker compose up -d (banco na porta 3310 + mailpit em http://localhost:8025)
+- cd backend && mvn spring-boot:run "-Dspring-boot.run.profiles=dev"
+- cd frontend && npm install && npm start (http://localhost:4200)
+
 Antes de qualquer tarefa, leia:
 - docs/ARQUITETURA.md — stack, pastas, contrato de API, RBAC, regras obrigatorias
 - docs/skills/transportmanager/SKILL.md — como codar, UX minima, Definition of Done
