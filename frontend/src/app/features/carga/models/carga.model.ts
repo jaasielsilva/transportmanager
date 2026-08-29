@@ -93,3 +93,17 @@ export interface CargaEstimativaRota {
   tempoEstimadoMinutos: number | null;
 }
 
+/**
+ * Endereco resolvido por CEP (`GET /ceps/{cep}` → ViaCEP no backend). Usado no
+ * autofill do form de carga: o CEP preenche endereco/cidade/UF para o "Calcular
+ * rota" tracar com precisao. Nao persiste nada — o CEP e so conveniencia de
+ * preenchimento.
+ */
+export interface CepDados {
+  cep: string;
+  logradouro: string | null;
+  bairro: string | null;
+  cidade: string;
+  uf: string;
+}
+

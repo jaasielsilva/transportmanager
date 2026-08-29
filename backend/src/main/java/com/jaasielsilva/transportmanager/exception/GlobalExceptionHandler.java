@@ -3,6 +3,7 @@ package com.jaasielsilva.transportmanager.exception;
 import com.jaasielsilva.transportmanager.common.ApiResponse;
 import com.jaasielsilva.transportmanager.common.ApiResponse.FieldError;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -78,6 +79,27 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> gatewayGeo(GatewayGeoException e) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(ApiResponse.error("Nao foi possivel calcular a rota agora. Tente novamente."));
+    }
+
+    /** 502 — o provedor de CEP (ViaCEP) falhou ou recebeu CEP malformado. */
+    @ExceptionHandler(GatewayCepException.class)
+    public ResponseEntity<ApiResponse<Void>> gatewayCep(GatewayCepException e) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ApiResponse.error("Nao foi possivel consultar o CEP agora. Tente novamente."));
+    }
+
+    /**
+     * 400 — validacao de @PathVariable/@RequestParam (@Pattern, @Min, ...). O
+     * MethodArgumentNotValidException cobre o body; sem este handler, um path
+     * var invalido cairia no catch-all 500.
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> validacaoParametro(ConstraintViolationException e) {
+        List<FieldError> erros = e.getConstraintViolations().stream()
+                .map(v -> new FieldError(v.getPropertyPath().toString(), v.getMessage()))
+                .toList();
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Verifique os campos informados.", erros));
     }
 
     /** 403 — autenticado, mas sem a role exigida pelo @PreAuthorize. */

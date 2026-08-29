@@ -10,6 +10,7 @@ import {
   CargaEstimativaRota,
   CargaResumo,
   CargaSalvar,
+  CepDados,
 } from '../models/carga.model';
 
 /**
@@ -82,6 +83,17 @@ export class CargaService {
   calcularRota(dados: CargaCalcularRota): Observable<CargaEstimativaRota> {
     return this.http
       .post<ApiResponse<CargaEstimativaRota>>(`${this.url}/calcular-rota`, dados)
+      .pipe(map((r) => r.data));
+  }
+
+  /**
+   * Autofill do form: CEP -> endereco/cidade/UF. O backend conversa com o
+   * ViaCEP (gratuito, sem chave) e devolve null para CEP inexistente — nao e
+   * erro, o form avisa e deixa digitar na mao.
+   */
+  buscarCep(cep: string): Observable<CepDados | null> {
+    return this.http
+      .get<ApiResponse<CepDados | null>>(`${environment.apiUrl}/ceps/${cep}`)
       .pipe(map((r) => r.data));
   }
 }
