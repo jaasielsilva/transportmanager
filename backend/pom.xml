@@ -23,7 +23,7 @@
         <java.version>21</java.version>
         <jjwt.version>0.12.6</jjwt.version>
         <shedlock.version>5.16.0</shedlock.version>
-        <springdoc.version>2.6.0</springdoc.version>
+        <springdoc.version>2.7.0</springdoc.version>
         <!-- Acima da versao que o Spring Boot gerencia, de proposito: o Docker
              Engine 29 removeu as versoes antigas da API, e o docker-java que
              vem com o Testcontainers 1.19 leva 400 em toda chamada. O sintoma
