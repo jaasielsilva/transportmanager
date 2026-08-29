@@ -1,0 +1,129 @@
+# Molde do kit — copiar para backend/src/main/resources/application.yml
+# Nenhum secret aqui: tudo por variavel de ambiente (.env / GitHub Secrets).
+spring:
+  application:
+    name: transportmanager
+
+  datasource:
+    # allowPublicKeyRetrieval=true e obrigatorio com MySQL 8: o plugin padrao
+    # (caching_sha2_password) precisa da chave publica do servidor para enviar
+    # a senha. Sem isso a aplicacao nem conecta.
+    # Em producao o banco fica na rede interna do compose (nunca exposto), por
+    # isso useSSL=false e aceitavel. Banco gerenciado ou fora da VPS -> ligar TLS.
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:transportmanager}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Sao_Paulo&characterEncoding=UTF-8
+    username: ${DB_USER:dev}
+    password: ${DB_PASSWORD:dev}
+    hikari:
+      # Regra pratica: 10 conexoes por instancia da app. MySQL com max_connections=200
+      # aguenta com folga; pool grande demais so troca fila na app por fila no banco.
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      leak-detection-threshold: 60000
+
+  jpa:
+    open-in-view: false          # evita query dentro do render e conexao presa
+    hibernate:
+      ddl-auto: validate         # NUNCA update: o schema e do Flyway
+    properties:
+      hibernate:
+        jdbc.batch_size: 30
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}      # 1025 = mailpit do docker-compose.dev.yml
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties.mail.smtp.starttls.enable: true
+
+  servlet.multipart:
+    max-file-size: 10MB
+    max-request-size: 10MB
+
+  task:
+    scheduling:
+      # O padrao do Spring e UMA thread para TODOS os @Scheduled. Com um job
+      # travado (banco lento, SMTP pendurado), os demais simplesmente nunca
+      # rodam — em silencio, sem erro no log. Dunning e expiracao de trial
+      # rodam com 30 min de diferenca e nao podem depender um do outro.
+      pool.size: 4
+      thread-name-prefix: sched-
+    execution:
+      # Pool do @Async (e-mails). Fila limitada de proposito: se o provedor de
+      # e-mail cair, a fila enche e falha rapido em vez de consumir memoria ate
+      # derrubar a aplicacao.
+      pool:
+        core-size: 4
+        max-size: 8
+        queue-capacity: 500
+      thread-name-prefix: async-
+
+app:
+  # Regua de cobranca de pagamento que falhou. Prazos em CONFIGURACAO porque
+  # voce vai querer ajustar sem deploy — mas iguais para todos os clientes:
+  # regua por tenant torna impossivel responder "quando meus clientes sao
+  # suspensos?". Excecao individual e o botao "prorrogar" do painel, auditado.
+  #
+  # dias precisam estar em ordem CRESCENTE — a aplicacao nao sobe se nao
+  # estiverem. Regua fora de ordem suspende cliente que esta em dia.
+  dunning:
+    etapas:
+      - { dias: 0,  nivel: NORMAL,          notificar: true }   # avisa, nao bloqueia
+      - { dias: 3,  nivel: NORMAL,          notificar: true }
+      - { dias: 7,  nivel: SOMENTE_LEITURA, notificar: true }   # ve os dados, nao grava
+      - { dias: 15, nivel: SUSPENSO,        notificar: false }  # so login e pagamento
+
+  base-url: ${APP_BASE_URL:http://localhost:4200}
+  cors.allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  uploads-dir: ${APP_UPLOADS_DIR:./uploads}
+  jwt:
+    secret: ${JWT_SECRET:troque-em-producao-min-64-chars-aleatorios-openssl-rand-base64-64}
+    access-token-minutes: 15
+    refresh-token-days: 7
+
+management:
+  endpoints.web.exposure.include: health,info,prometheus
+  endpoint.health:
+    show-details: when-authorized     # nunca expor detalhe de infra publicamente
+    probes.enabled: true
+  health:
+    # SMTP fora do ar NAO e aplicacao fora do ar. Com o indicador ligado, o
+    # /actuator/health responde DOWN por causa do e-mail — e o smoke test do
+    # deploy faz ROLLBACK de uma versao que esta perfeitamente sa. Falha de
+    # e-mail se descobre pelo log e pelo alerta, nao derrubando o deploy.
+    mail.enabled: false
+  metrics.tags.app: transportmanager    # label usada pelo Alertmanager para rotear o Telegram
+
+logging:
+  pattern:
+    # traceId em todo log — sem isso nao se investiga incidente em producao
+    console: "%d{HH:mm:ss} %-5level [%X{traceId:-}] %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.jaasielsilva: INFO
+
+server:
+  # A app esta atras do Nginx: sem isso ela monta links http:// nos e-mails
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+---
+spring:
+  config.activate.on-profile: dev
+  jpa.show-sql: true
+logging.level.org.hibernate.orm.jdbc.bind: TRACE   # ajuda a caçar N+1 em dev
+
+---
+spring:
+  config.activate.on-profile: homolog
+
+---
+spring:
+  config.activate.on-profile: prod
+logging.level.root: WARN

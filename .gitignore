@@ -1,0 +1,32 @@
+# Molde do kit — copiar para .gitignore na raiz do repo.
+
+# Secrets — o vazamento mais comum e o mais caro
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.my-*.cnf
+
+# Java / Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.log
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+coverage/
+npm-debug.log*
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Uploads e backups locais
+uploads/
+backups/
+*.sql.gz

@@ -1,0 +1,261 @@
+/**
+ * Design System do projeto — molde do kit.
+ *
+ * TODA cor, espacamento e raio sai daqui. Componente com hex escrito direto no
+ * CSS e o motivo pelo qual "mudar a cor da marca" vira uma tarefa de dois dias
+ * em vez de uma linha. Trocar os valores abaixo troca a aparencia do sistema
+ * inteiro; a tabela do Design System na skill (secao 2) e o espelho deste
+ * arquivo.
+ */
+:root {
+  /* --- Marca --- */
+  --color-primary: #4f46e5;
+  --color-primary-escuro: #4338ca;
+  --color-primary-suave: #eef2ff;
+  --color-accent: #0ea5e9;
+
+  /* --- Superficies --- */
+  --bg-page: #f6f7fb;
+  --card-bg: #ffffff;
+  --sidebar-bg: #111827;
+  --sidebar-texto: #cbd5e1;
+
+  /* --- Texto --- */
+  --texto: #111827;
+  --texto-suave: #6b7280;
+
+  /* --- Semanticas (estado, nao decoracao) --- */
+  --sucesso: #059669;
+  --aviso: #d97706;
+  --erro: #dc2626;
+  --erro-suave: #fef2f2;
+  --borda: #e5e7eb;
+
+  /* --- Forma e profundidade --- */
+  --raio: 10px;
+  --raio-pequeno: 6px;
+  --sombra: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+  --sombra-alta: 0 10px 25px rgba(16, 24, 40, 0.15);
+  --espaco: 16px;
+
+  --fonte: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--fonte);
+  color: var(--texto);
+  background: var(--bg-page);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0 0 4px;
+}
+h2 {
+  font-size: 1.15rem;
+  margin: 0 0 12px;
+}
+
+/* =====================================================================
+   Componentes de uso geral. Ficam globais de proposito: sao a linguagem
+   visual do produto, e repetir estilo de botao em cada componente e como
+   se produz uma tela que "parece de outro sistema".
+   ===================================================================== */
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 20px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: var(--raio-pequeno);
+  background: var(--color-primary);
+  color: #fff;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn:hover:not(:disabled) {
+  background: var(--color-primary-escuro);
+}
+/* Botao desabilitado precisa PARECER desabilitado: o duplo clique no submit
+   costuma nascer de um botao que continua com cara de clicavel. */
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-secundario {
+  background: var(--card-bg);
+  color: var(--texto);
+  border-color: var(--borda);
+}
+.btn-secundario:hover:not(:disabled) {
+  background: var(--bg-page);
+}
+.btn-perigo {
+  background: var(--erro);
+}
+.btn-perigo:hover:not(:disabled) {
+  background: #b91c1c;
+}
+.btn-link {
+  background: none;
+  color: var(--color-primary);
+  border: none;
+  padding: 0;
+  min-height: auto;
+}
+
+.campo {
+  display: block;
+  margin-bottom: 14px;
+}
+/* Alvo real do texto do campo: todo formulario deste padrao usa
+   <label class="campo"><span>Nome</span><input/></label> — o span e' filho
+   direto, nunca um <label> aninhado. Selecionar ".campo > label" nunca casa
+   com nada; o texto do campo roda sem o espacamento nem o estilo pretendido
+   em toda tela, em silencio, ate algo ficar visualmente colado (ex.: um link
+   ao lado do texto do campo) revelar o bug. */
+.campo > span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+}
+.campo input,
+.campo select,
+.campo textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--card-bg);
+  font: inherit;
+  color: var(--texto);
+}
+.campo input:focus,
+.campo select:focus,
+.campo textarea:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -1px;
+}
+.campo input.invalido,
+.campo textarea.invalido {
+  border-color: var(--erro);
+  background: var(--erro-suave);
+}
+.erro-campo {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--erro);
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card-bg);
+}
+.tabela th,
+.tabela td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--borda);
+}
+.tabela th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--texto-suave);
+  background: var(--bg-page);
+}
+.tabela tbody tr:hover {
+  background: var(--color-primary-suave);
+}
+
+.selo {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--borda);
+  color: var(--texto-suave);
+}
+.selo-ativo {
+  background: #d1fae5;
+  color: var(--sucesso);
+}
+.selo-inativo {
+  background: #fee2e2;
+  color: var(--erro);
+}
+
+.barra-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: var(--espaco);
+  flex-wrap: wrap;
+}
+
+.texto-suave {
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+}
+
+/* Telas publicas (login, criar conta, recuperar senha) — mesmo enquadramento
+   em todas: e a primeira impressao do produto e a mais barata de acertar. */
+.tela-auth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+.tela-auth .caixa {
+  width: min(400px, 100%);
+}
+.tela-auth .marca {
+  margin-bottom: 20px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-align: center;
+}
+.tela-auth .rodape {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 0.9rem;
+}

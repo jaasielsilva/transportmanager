@@ -1,0 +1,146 @@
+# Molde de CI/CD do kit — copiado para .github/workflows/ci.yml.
+# Layout esperado do repo: backend/ (pom.xml) e frontend/ (package.json) na raiz.
+# Branches fixas: dev -> Homologacao | main -> Producao.
+#
+# Imagens sao publicadas com tag IMUTAVEL sha-<commit> e um alias movel
+# (latest/homolog). O deploy usa o SHA — e por isso que rollback existe:
+#   cd /opt/transportmanager && IMAGE_TAG=sha-<commit-anterior> docker compose up -d
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: ghcr.io/jaasielsilva/transportmanager
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: backend }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Testes e build
+        run: mvn -B verify
+      # Falha o build se a cobertura cair abaixo do minimo (regra no pom.xml, jacoco check).
+      - name: Relatorio de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco
+          path: backend/target/site/jacoco/
+          if-no-files-found: ignore
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: frontend }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      # Angular 22 roda os testes com Vitest em jsdom — sem navegador, sem
+      # Karma, sem flag de headless.
+      - run: npm test
+      - run: npm run build
+
+  # Segredo commitado e dependencia vulneravel nao passam. Roda em PR tambem —
+  # relatorio limpo aqui e material de venda em cliente B2B.
+  seguranca:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Secret scanning
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Vulnerabilidades em dependencias
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+  deploy:
+    needs: [backend, frontend, seguranca]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    permissions:
+      contents: read
+      packages: write
+    env:
+      SHA_TAG: sha-${{ github.sha }}
+      ALIAS_TAG: ${{ github.ref == 'refs/heads/main' && 'latest' || 'homolog' }}
+      APP_DIR: ${{ github.ref == 'refs/heads/main' && '/opt/transportmanager' || '/opt/transportmanager-homolog' }}
+      AMBIENTE: ${{ github.ref == 'refs/heads/main' && 'Producao' || 'Homologacao' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login no ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push (sha imutavel + alias movel)
+        run: |
+          set -e
+          for svc in backend frontend; do
+            docker build \
+              -t "$IMAGE_BASE/$svc:$SHA_TAG" \
+              -t "$IMAGE_BASE/$svc:$ALIAS_TAG" \
+              "./$svc"
+            docker push "$IMAGE_BASE/$svc:$SHA_TAG"
+            docker push "$IMAGE_BASE/$svc:$ALIAS_TAG"
+          done
+
+      # Sobe pelo SHA e faz smoke no /actuator/health de dentro do container.
+      # Health nao volta UP -> rollback automatico para a imagem anterior e job falha.
+      - name: Deploy na VPS + smoke test
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: SHA_TAG,APP_DIR,AMBIENTE
+          script: |
+            set -e
+            cd "$APP_DIR"
+
+            ANTERIOR=$(grep '^IMAGE_TAG=' .env | cut -d= -f2)
+            echo "Tag atual: $ANTERIOR -> nova: $SHA_TAG"
+
+            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$SHA_TAG|" .env
+            docker compose pull
+            docker compose up -d --remove-orphans
+
+            echo "Aguardando health do backend..."
+            for i in $(seq 1 30); do
+              if docker compose exec -T backend wget -qO- http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
+                echo "OK — $AMBIENTE no ar em $SHA_TAG"
+                docker image prune -f --filter "until=168h" || true
+                exit 0
+              fi
+              sleep 10
+            done
+
+            echo "FALHA no smoke test — revertendo para $ANTERIOR"
+            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$ANTERIOR|" .env
+            docker compose up -d
+            exit 1

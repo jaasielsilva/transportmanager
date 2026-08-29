@@ -1,0 +1,45 @@
+# Molde do kit — copiar para docker-compose.yml na RAIZ do repo.
+# Ambiente local do desenvolvedor: sobe banco (+ mailpit + redis) e o dev roda
+# backend e frontend na maquina, com hot reload.
+#
+#   docker compose up -d
+#   cd backend && mvn spring-boot:run -Dspring-boot.run.profiles=dev
+#   cd frontend && npm start
+services:
+
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    # Se voce ja tem MySQL instalado na maquina, a 3306 esta ocupada:
+    #   DB_PORT_HOST=3310 docker compose up -d
+    # e aponte spring.datasource no application.yml (ou DB_PORT=3310 no ambiente).
+    ports:
+      - "${DB_PORT_HOST:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: transportmanager
+      MYSQL_USER: dev
+      MYSQL_PASSWORD: dev
+      TZ: America/Sao_Paulo
+    volumes:
+      - db_data_dev:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      retries: 10
+
+  # Captura todo e-mail enviado em dev — convite, reset de senha, dunning.
+  # UI em http://localhost:8025 . Nunca configure SMTP real no profile dev.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025"   # interface web
+      - "1025:1025"   # SMTP
+
+  # redis:
+  #   image: redis:7-alpine
+  #   ports: ["6379:6379"]
+
+volumes:
+  db_data_dev:
