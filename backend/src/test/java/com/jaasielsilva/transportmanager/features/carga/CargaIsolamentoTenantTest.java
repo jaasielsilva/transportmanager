@@ -90,12 +90,18 @@ class CargaIsolamentoTenantTest {
     @DisplayName("uma empresa nao le, nao edita e nao exclui o registro da outra")
     void naoAtravessaTenant() {
         Detalhe daA = comTenant(EMPRESA_A, () -> service.criar(
-                new SalvarRequest("Cadastro da A", "a@exemplo.com", null, "99999999999", null, null)));
+                new SalvarRequest(
+                        "Cadastro da A", "a@exemplo.com", null, "99999999999", null, null,
+                        null, null, null, null, null, null, null, null, null, null,
+                        null, null, null, null, null, null)));
 
         // Mesmo documento na empresa B: se a UNIQUE fosse global, isto falharia
         // — e o cliente numero 2 nunca conseguiria cadastrar.
         Detalhe daB = comTenant(EMPRESA_B, () -> service.criar(
-                new SalvarRequest("Cadastro da B", "b@exemplo.com", null, "99999999999", null, null)));
+                new SalvarRequest(
+                        "Cadastro da B", "b@exemplo.com", null, "99999999999", null, null,
+                        null, null, null, null, null, null, null, null, null, null,
+                        null, null, null, null, null, null)));
 
         assertThat(daA.id()).isNotEqualTo(daB.id());
 
@@ -110,7 +116,10 @@ class CargaIsolamentoTenantTest {
                     .isInstanceOf(RecursoNaoEncontradoException.class);
 
             assertThatThrownBy(() -> service.atualizar(daA.id(),
-                    new SalvarRequest("Invadido", null, null, null, null, null)))
+                    new SalvarRequest(
+                            "Invadido", null, null, null, null, null,
+                            null, null, null, null, null, null, null, null, null, null,
+                            null, null, null, null, null, null)))
                     .isInstanceOf(RecursoNaoEncontradoException.class);
 
             assertThatThrownBy(() -> service.excluir(daA.id()))
@@ -127,7 +136,10 @@ class CargaIsolamentoTenantTest {
     @DisplayName("empresa_id gravado vem do contexto, nao do request")
     void gravaOTenantDoContexto() {
         Detalhe criado = comTenant(EMPRESA_A, () -> service.criar(
-                new SalvarRequest("Da empresa A", null, null, null, null, null)));
+                new SalvarRequest(
+                        "Da empresa A", null, null, null, null, null,
+                        null, null, null, null, null, null, null, null, null, null,
+                        null, null, null, null, null, null)));
 
         Long empresaGravada = jdbc.queryForObject(
                 "SELECT empresa_id FROM cargas WHERE id = ?", Long.class, criado.id());
@@ -140,7 +152,9 @@ class CargaIsolamentoTenantTest {
     void softDeleteLiberaAChaveUnica() {
         comTenant(EMPRESA_A, () -> {
             Detalhe primeiro = service.criar(new SalvarRequest(
-                    "Primeiro", null, null, "55555555555", null, null));
+                    "Primeiro", null, null, "55555555555", null, null,
+                    null, null, null, null, null, null, null, null, null, null,
+                    null, null, null, null, null, null));
             service.excluir(primeiro.id());
 
             assertThat(service.listar("", PageRequest.of(0, 20)).content()).isEmpty();
@@ -148,7 +162,9 @@ class CargaIsolamentoTenantTest {
             // Recadastro do MESMO documento: e o caso que a sentinela deleted_seq
             // existe para permitir.
             Detalhe recadastro = service.criar(new SalvarRequest(
-                    "Recadastrado", null, null, "55555555555", null, null));
+                    "Recadastrado", null, null, "55555555555", null, null,
+                    null, null, null, null, null, null, null, null, null, null,
+                    null, null, null, null, null, null));
             assertThat(recadastro.id()).isNotEqualTo(primeiro.id());
             return null;
         });
