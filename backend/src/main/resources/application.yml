@@ -10,7 +10,7 @@ spring:
     # a senha. Sem isso a aplicacao nem conecta.
     # Em producao o banco fica na rede interna do compose (nunca exposto), por
     # isso useSSL=false e aceitavel. Banco gerenciado ou fora da VPS -> ligar TLS.
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:transportmanager}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Sao_Paulo&characterEncoding=UTF-8
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3310}/${DB_NAME:transportmanager}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Sao_Paulo&characterEncoding=UTF-8
     username: ${DB_USER:dev}
     password: ${DB_PASSWORD:dev}
     hikari:

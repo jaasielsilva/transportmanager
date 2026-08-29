@@ -10,11 +10,10 @@ services:
   db:
     image: mysql:8.0
     restart: unless-stopped
-    # Se voce ja tem MySQL instalado na maquina, a 3306 esta ocupada:
-    #   DB_PORT_HOST=3310 docker compose up -d
-    # e aponte spring.datasource no application.yml (ou DB_PORT=3310 no ambiente).
+    # Porta 3310 por padrao para evitar conflito com MySQL local (3306)
+    # Se quiser usar 3306 mesmo: DB_PORT_HOST=3306 docker compose up -d
     ports:
-      - "${DB_PORT_HOST:-3306}:3306"
+      - "${DB_PORT_HOST:-3310}:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: transportmanager
