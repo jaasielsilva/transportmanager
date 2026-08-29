@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ApiResponse, PageResponse } from '../../../core/models/api.model';
-import { CargaDetalhe, CargaResumo, CargaSalvar } from '../models/carga.model';
+import { CargaAtualizarStatus, CargaDetalhe, CargaResumo, CargaSalvar } from '../models/carga.model';
 
 /**
  * Molde do kit — features/carga/services/carga.service.ts
@@ -51,7 +51,17 @@ export class CargaService {
       .pipe(map((r) => r.data));
   }
 
-  /** Soft delete no backend — o registro continua la, marcado. */
+  /**
+   * Atualiza o status da carga seguindo o fluxo de transporte
+   * Endpoint específico para mudanças de status
+   */
+  atualizarStatus(id: number, dados: CargaAtualizarStatus): Observable<CargaDetalhe> {
+    return this.http
+      .patch<ApiResponse<CargaDetalhe>>(`${this.url}/${id}/status`, dados)
+      .pipe(map((r) => r.data));
+  }
+
+  /** Soft delete no backend — o registro continua lá, marcado. */
   excluir(id: number): Observable<unknown> {
     return this.http.delete(`${this.url}/${id}`);
   }

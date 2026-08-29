@@ -20,27 +20,78 @@ public final class CargaMapper {
     private CargaMapper() {}
 
     public static Resumo paraResumo(Carga e) {
-        return new Resumo(e.getId(), e.getNome(), e.getEmail(), e.getTelefone(), e.isAtivo());
+        return new Resumo(
+            e.getId(), 
+            e.getNome(), 
+            e.getStatus(),
+            e.getOrigemCidade(),
+            e.getOrigemUf(),
+            e.getDestinoCidade(),
+            e.getDestinoUf(),
+            e.getValorFrete(),
+            e.isAtivo()
+        );
     }
 
     public static Detalhe paraDetalhe(Carga e) {
         return new Detalhe(
                 e.getId(), e.getNome(), e.getEmail(), e.getTelefone(),
                 e.getDocumento(), e.getObservacao(), e.isAtivo(),
-                e.getCreatedAt(), e.getUpdatedAt());
+                e.getCreatedAt(), e.getUpdatedAt(),
+                // Campos específicos de transporte
+                e.getOrigemEndereco(),
+                e.getOrigemCidade(),
+                e.getOrigemUf(),
+                e.getDestinoEndereco(),
+                e.getDestinoCidade(),
+                e.getDestinoUf(),
+                e.getPeso(),
+                e.getValorFrete(),
+                e.getStatus(),
+                e.getMotoristaId(),
+                e.getClienteId(),
+                e.getDataColeta(),
+                e.getDataEntregaPrevista(),
+                e.getDataEntregaReal(),
+                e.getDistanciaKm(),
+                e.getTempoEstimadoMinutos()
+        );
     }
 
     /** Copia o request para a entity — criacao e edicao usam o mesmo caminho. */
     public static void aplicar(SalvarRequest req, Carga destino) {
+        // Campos originais do CRUD genérico
         destino.setNome(req.nome().trim());
         destino.setEmail(normalizar(req.email()));
         destino.setTelefone(normalizar(req.telefone()));
         destino.setDocumento(normalizar(req.documento()));
         destino.setObservacao(normalizar(req.observacao()));
-        // Ausente no request = mantem o valor atual; na criacao, ativo.
         if (req.ativo() != null) {
             destino.setAtivo(req.ativo());
         }
+
+        // Campos específicos de transporte
+        destino.setOrigemEndereco(normalizar(req.origemEndereco()));
+        destino.setOrigemCidade(normalizar(req.origemCidade()));
+        destino.setOrigemUf(normalizar(req.origemUf()));
+        destino.setDestinoEndereco(normalizar(req.destinoEndereco()));
+        destino.setDestinoCidade(normalizar(req.destinoCidade()));
+        destino.setDestinoUf(normalizar(req.destinoUf()));
+        destino.setPeso(req.peso());
+        destino.setValorFrete(req.valorFrete());
+        // Status so muda se vier preenchido: na edicao o form nao envia status
+        // (a troca tem endpoint proprio com validacao de transicao), e null
+        // aqui apagaria o status atual.
+        if (req.status() != null && !req.status().isBlank()) {
+            destino.setStatus(normalizar(req.status()));
+        }
+        destino.setMotoristaId(req.motoristaId());
+        destino.setClienteId(req.clienteId());
+        destino.setDataColeta(req.dataColeta());
+        destino.setDataEntregaPrevista(req.dataEntregaPrevista());
+        destino.setDataEntregaReal(req.dataEntregaReal());
+        destino.setDistanciaKm(req.distanciaKm());
+        destino.setTempoEstimadoMinutos(req.tempoEstimadoMinutos());
     }
 
     /**

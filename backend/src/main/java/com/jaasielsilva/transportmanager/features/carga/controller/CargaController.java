@@ -2,6 +2,7 @@ package com.jaasielsilva.transportmanager.features.carga.controller;
 
 import com.jaasielsilva.transportmanager.common.ApiResponse;
 import com.jaasielsilva.transportmanager.common.PageResponse;
+import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.AtualizarStatusRequest;
 import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.Detalhe;
 import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.Resumo;
 import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.SalvarRequest;
@@ -70,15 +71,25 @@ public class CargaController {
     @PutMapping("/{id}")
     public ApiResponse<Detalhe> atualizar(@PathVariable Long id,
                                           @Valid @RequestBody SalvarRequest req) {
-        return ApiResponse.ok(service.atualizar(id, req), "Alteracoes salvas.");
+        return ApiResponse.ok(service.atualizar(id, req), "Alterações salvas.");
     }
 
-    /** Exclusao e soft delete e so o admin do tenant faz. */
+    /**
+     * Atualiza o status da carga seguindo o fluxo de transporte
+     * Endpoint específico para mudanças de status
+     */
+    @PatchMapping("/{id}/status")
+    public ApiResponse<Detalhe> atualizarStatus(@PathVariable Long id,
+                                                @Valid @RequestBody AtualizarStatusRequest req) {
+        return ApiResponse.ok(service.atualizarStatus(id, req), "Status atualizado.");
+    }
+
+    /** Exclusão é soft delete e só o admin do tenant faz. */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('TENANT_ADMIN')")
     public ApiResponse<Void> excluir(@PathVariable Long id) {
         service.excluir(id);
-        return ApiResponse.ok(null, "Carga excluido.");
+        return ApiResponse.ok(null, "Carga excluída.");
     }
 
     /**
