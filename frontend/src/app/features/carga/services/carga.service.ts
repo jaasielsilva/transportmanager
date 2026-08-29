@@ -3,7 +3,14 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ApiResponse, PageResponse } from '../../../core/models/api.model';
-import { CargaAtualizarStatus, CargaDetalhe, CargaResumo, CargaSalvar } from '../models/carga.model';
+import {
+  CargaAtualizarStatus,
+  CargaCalcularRota,
+  CargaDetalhe,
+  CargaEstimativaRota,
+  CargaResumo,
+  CargaSalvar,
+} from '../models/carga.model';
 
 /**
  * Molde do kit — features/carga/services/carga.service.ts
@@ -64,5 +71,17 @@ export class CargaService {
   /** Soft delete no backend — o registro continua lá, marcado. */
   excluir(id: number): Observable<unknown> {
     return this.http.delete(`${this.url}/${id}`);
+  }
+
+  /**
+   * Estimativa de rota (Distance Matrix). Endpoint helper do form: o backend
+   * conversa com o Google (a key nunca sai do servidor) e so devolve numeros —
+   * quem grava e o "Salvar" normal. Null na resposta nao e erro: e rota nao
+   * encontrada.
+   */
+  calcularRota(dados: CargaCalcularRota): Observable<CargaEstimativaRota> {
+    return this.http
+      .post<ApiResponse<CargaEstimativaRota>>(`${this.url}/calcular-rota`, dados)
+      .pipe(map((r) => r.data));
   }
 }

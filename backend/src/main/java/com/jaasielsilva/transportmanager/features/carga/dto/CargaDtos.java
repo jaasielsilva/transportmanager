@@ -139,4 +139,31 @@ public final class CargaDtos {
     public record AtualizarStatusRequest(
             @NotBlank(message = "Informe o novo status.")
             String status) {}
+
+    /**
+     * Request do helper "Calcular rota": pede a estimativa ao provedor de
+     * geolocalizacao (Distance Matrix) a partir dos enderecos do form. Nao
+     * persiste nada — o resultado vai para distanciaKm/tempoEstimadoMinutos no
+     * SalvarRequest normal.
+     */
+    public record CalcularRotaRequest(
+            @NotBlank(message = "Informe a cidade de origem.")
+            @Size(max = 100)
+            String origemCidade,
+
+            @Size(max = 2)
+            String origemUf,
+
+            @Size(max = 255)
+            String origemEndereco,
+
+            @NotBlank(message = "Informe a cidade de destino.")
+            @Size(max = 100)
+            String destinoCidade,
+
+            @Size(max = 2)
+            String destinoUf,
+
+            @Size(max = 255)
+            String destinoEndereco) {}
 }

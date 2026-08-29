@@ -42,6 +42,14 @@ spring:
     password: ${MAIL_PASSWORD:}
     properties.mail.smtp.starttls.enable: true
 
+  # Timeouts do RestClient.Builder auto-configurado (usado no gateway do Google
+  # Maps). Curtos de proposito: o botao "Calcular rota" do form espera na hora —
+  # 10s de leitura e o teto antes do toast de erro.
+  http:
+    client:
+      connect-timeout: 5s
+      read-timeout: 10s
+
   servlet.multipart:
     max-file-size: 10MB
     max-request-size: 10MB
@@ -86,6 +94,12 @@ app:
     secret: ${JWT_SECRET:troque-em-producao-min-64-chars-aleatorios-openssl-rand-base64-64}
     access-token-minutes: 15
     refresh-token-days: 7
+  google-maps:
+    # API key do Google Maps — SOMENTE no backend. Nunca vai para o bundle do
+    # frontend (a regra do projeto: secret so por variavel de ambiente).
+    # Default vazio de proposito: sem a key, o endpoint de rota responde 502
+    # (GatewayGeoException) em vez de subir com valor falso.
+    api-key: ${GOOGLE_MAPS_API_KEY:}
 
 management:
   endpoints.web.exposure.include: health,info,prometheus

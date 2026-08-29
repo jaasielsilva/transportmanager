@@ -69,3 +69,27 @@ export interface CargaSalvar {
 export interface CargaAtualizarStatus {
   status: string;
 }
+
+/**
+ * Entrada do endpoint helper `POST /cargas/calcular-rota`. So os enderecos que
+ * o Google usa para tracar a rota — nada de id nem tenant (vem do token).
+ */
+export interface CargaCalcularRota {
+  origemCidade: string;
+  origemUf: string | null;
+  origemEndereco: string | null;
+  destinoCidade: string;
+  destinoUf: string | null;
+  destinoEndereco: string | null;
+}
+
+/**
+ * Saida do mesmo endpoint. Nulls sao intencionais: o Google pode nao achar rota
+ * (ZERO_RESULTS) e isso nao e erro — e o form que decide o que fazer com o campo
+ * em branco (aviso sem sobrescrever o que ja esta la).
+ */
+export interface CargaEstimativaRota {
+  distanciaKm: number | null;
+  tempoEstimadoMinutos: number | null;
+}
+

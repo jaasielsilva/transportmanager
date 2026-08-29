@@ -69,6 +69,17 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Verifique os campos informados.", erros));
     }
 
+    /**
+     * 502 — o upstream (Google Maps) falhou ou nao esta configurado. Nao e um
+     * bug nosso: a mensagem e amigavel e o detalhe real fica no log (o gateway
+     * ja logou a causa antes de lancar).
+     */
+    @ExceptionHandler(GatewayGeoException.class)
+    public ResponseEntity<ApiResponse<Void>> gatewayGeo(GatewayGeoException e) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ApiResponse.error("Nao foi possivel calcular a rota agora. Tente novamente."));
+    }
+
     /** 403 — autenticado, mas sem a role exigida pelo @PreAuthorize. */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> acessoNegado(AccessDeniedException e) {

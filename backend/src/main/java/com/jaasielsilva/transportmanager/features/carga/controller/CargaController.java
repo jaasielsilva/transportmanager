@@ -3,10 +3,13 @@ package com.jaasielsilva.transportmanager.features.carga.controller;
 import com.jaasielsilva.transportmanager.common.ApiResponse;
 import com.jaasielsilva.transportmanager.common.PageResponse;
 import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.AtualizarStatusRequest;
+import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.CalcularRotaRequest;
 import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.Detalhe;
 import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.Resumo;
 import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.SalvarRequest;
 import com.jaasielsilva.transportmanager.features.carga.service.CargaService;
+import com.jaasielsilva.transportmanager.features.geo.dto.GeoDtos.EstimativaRota;
+import com.jaasielsilva.transportmanager.features.geo.service.GeoService;
 import com.jaasielsilva.transportmanager.features.platform.Modulo;
 import com.jaasielsilva.transportmanager.features.platform.RequiresModule;
 import jakarta.validation.Valid;
@@ -41,9 +44,11 @@ public class CargaController {
     private static final int SIZE_MAXIMO = 100;
 
     private final CargaService service;
+    private final GeoService geoService;
 
-    public CargaController(CargaService service) {
+    public CargaController(CargaService service, GeoService geoService) {
         this.service = service;
+        this.geoService = geoService;
     }
 
     @GetMapping
@@ -84,6 +89,20 @@ public class CargaController {
         return ApiResponse.ok(service.atualizarStatus(id, req), "Status atualizado.");
     }
 
+    /**
+     * Helper do form de carga: pede a estimativa de rota (distancia + tempo) ao
+     * provedor de geolocalizacao. So devolve o calculo — quem grava e o PUT/POST
+     * normal, que ja carrega distanciaKm/tempoEstimadoMinutos.
+     *
+     * A API key do Google vive no backend (env var). Este endpoint e o proxy:
+     * o front nunca toca na key.
+     */
+    @PostMapping("/calcular-rota")
+    public ApiResponse<EstimativaRota> calcularRota(@Valid @RequestBody CalcularRotaRequest req) {
+        return ApiResponse.ok(geoService.estimarRota(
+                montarOrigem(req), montarDestino(req)));
+    }
+
     /** Exclusão é soft delete e só o admin do tenant faz. */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('TENANT_ADMIN')")
@@ -101,5 +120,30 @@ public class CargaController {
         return pageable.getPageSize() <= SIZE_MAXIMO
                 ? pageable
                 : PageRequest.of(pageable.getPageNumber(), SIZE_MAXIMO, pageable.getSort());
+    }
+
+    /**
+     * Monta a string de endereco que o Google entende. Cidade e obrigatoria
+     * (validada no request); endereco e UF entram quando presentes.
+     */
+    private String montarOrigem(CalcularRotaRequest req) {
+        return montarEndereco(req.origemEndereco(), req.origemCidade(), req.origemUf());
+    }
+
+    private String montarDestino(CalcularRotaRequest req) {
+        return montarEndereco(req.destinoEndereco(), req.destinoCidade(), req.destinoUf());
+    }
+
+    private String montarEndereco(String endereco, String cidade, String uf) {
+        StringBuilder sb = new StringBuilder();
+        if (endereco != null && !endereco.isBlank()) {
+            sb.append(endereco.trim()).append(", ");
+        }
+        sb.append(cidade.trim());
+        if (uf != null && !uf.isBlank()) {
+            sb.append("/").append(uf.trim());
+        }
+        sb.append(", Brasil");
+        return sb.toString();
     }
 }
