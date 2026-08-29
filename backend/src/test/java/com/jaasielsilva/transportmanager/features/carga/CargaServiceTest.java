@@ -16,11 +16,13 @@ import com.jaasielsilva.transportmanager.config.tenant.TenantContext;
 import com.jaasielsilva.transportmanager.exception.LimiteDoPlanoException;
 import com.jaasielsilva.transportmanager.exception.RecursoNaoEncontradoException;
 import com.jaasielsilva.transportmanager.exception.RegraDeNegocioException;
+import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.AtualizarStatusRequest;
 import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.SalvarRequest;
 import com.jaasielsilva.transportmanager.features.carga.entity.Carga;
 import com.jaasielsilva.transportmanager.features.carga.repository.CargaRepository;
 import com.jaasielsilva.transportmanager.features.carga.service.CargaService;
 import com.jaasielsilva.transportmanager.features.platform.QuotaService;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,8 +37,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * Molde do kit — teste de referencia do Service.
  *
  * O que se testa aqui e o que quebra dinheiro ou dado: quota do plano,
- * duplicidade, 404 entre tenants e exclusao logica. Getter e setter nao entram
- * na conta de cobertura de ninguem.
+ * duplicidade, 404 entre tenants, exclusao logica e — desde a evolucao para
+ * transporte — as regras de status e datas. Getter e setter nao entram na
+ * conta de cobertura de ninguem.
  *
  * O isolamento de verdade (uma empresa nao enxergar a outra) e provado no
  * CargaIsolamentoTenantTest, contra MySQL real — com mock nao se prova
@@ -74,12 +77,15 @@ class CargaServiceTest {
         });
 
         var detalhe = service.criar(new SalvarRequest(
-                "  Maria Souza  ", "maria@exemplo.com", "11999999999", "12345678900", "", null));
+                "  Maria Souza  ", "maria@exemplo.com", "11999999999", "12345678900", "", null,
+                "Rua A", "Sao Paulo", "SP", "Rua B", "Rio de Janeiro", "RJ",
+                null, null, null, null, null, null, null, null, null, null));
 
         assertThat(detalhe.id()).isEqualTo(1L);
         assertThat(detalhe.nome()).isEqualTo("Maria Souza");     // trim aplicado
         assertThat(detalhe.observacao()).isNull();               // "" vira null
         assertThat(detalhe.ativo()).isTrue();                    // padrao da entity
+        assertThat(detalhe.status()).isEqualTo("PENDENTE");      // nasce pendente
 
         ArgumentCaptor<Carga> captor = ArgumentCaptor.forClass(Carga.class);
         verify(repository).save(captor.capture());
@@ -140,8 +146,71 @@ class CargaServiceTest {
         verify(auditoriaService).registrar(eq(EMPRESA), eq("EXCLUSAO"), anyString(), eq(5L), any());
     }
 
+    @Test
+    @DisplayName("transicao PENDENTE -> COLETADA grava a data de coleta")
+    void transicaoPendenteParaColetada() {
+        var alvo = new Carga();
+        alvo.setId(6L);
+        alvo.setStatus("PENDENTE");
+        when(repository.findByIdAndDeletedAtIsNull(6L)).thenReturn(Optional.of(alvo));
+
+        var detalhe = service.atualizarStatus(6L, new AtualizarStatusRequest("coletada"));
+
+        assertThat(detalhe.status()).isEqualTo("COLETADA"); // normalizado para maiusculas
+        assertThat(alvo.getDataColeta()).isNotNull();
+        verify(repository).save(alvo);
+    }
+
+    @Test
+    @DisplayName("carga ENTREGUE e terminal: nao muda mais de status")
+    void entregaFinalNaoMudaDeStatus() {
+        var alvo = new Carga();
+        alvo.setId(7L);
+        alvo.setStatus("ENTREGUE");
+        when(repository.findByIdAndDeletedAtIsNull(7L)).thenReturn(Optional.of(alvo));
+
+        assertThatThrownBy(() -> service.atualizarStatus(7L, new AtualizarStatusRequest("COLETADA")))
+                .isInstanceOf(RegraDeNegocioException.class);
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("nao exclui carga em transito")
+    void naoExcluiEmTransito() {
+        var alvo = new Carga();
+        alvo.setId(8L);
+        alvo.setStatus("EM_TRANSITO");
+        when(repository.findByIdAndDeletedAtIsNull(8L)).thenReturn(Optional.of(alvo));
+
+        assertThatThrownBy(() -> service.excluir(8L))
+                .isInstanceOf(RegraDeNegocioException.class)
+                .hasMessageContaining("trânsito");
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("entrega prevista antes da coleta vira erro de negocio")
+    void entregaAntesDaColeta() {
+        var req = new SalvarRequest(
+                "Maria", "maria@exemplo.com", null, null, null, true,
+                "Rua A", "Sao Paulo", "SP", "Rua B", "Rio de Janeiro", "RJ",
+                null, null, null, null, null,
+                LocalDateTime.of(2026, 8, 30, 10, 0),  // dataColeta
+                LocalDateTime.of(2026, 8, 29, 10, 0),  // dataEntregaPrevista (antes)
+                null, null, null);
+
+        assertThatThrownBy(() -> service.criar(req))
+                .isInstanceOf(RegraDeNegocioException.class);
+
+        verify(repository, never()).save(any());
+    }
+
     private SalvarRequest novoRequest() {
-        return new SalvarRequest("Maria Souza", "maria@exemplo.com",
-                "11999999999", "12345678900", null, null);
+        return new SalvarRequest(
+                "Maria Souza", "maria@exemplo.com", "11999999999", "12345678900", "obs", true,
+                "Rua A", "Sao Paulo", "SP", "Rua B", "Rio de Janeiro", "RJ",
+                null, null, null, null, null, null, null, null, null, null);
     }
 }

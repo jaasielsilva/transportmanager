@@ -222,6 +222,28 @@ h2 {
   color: var(--erro);
 }
 
+/* Selos de status de carga — fundo em tom claro, texto no token semantico. */
+.selo-coletada {
+  background: var(--color-primary-suave);
+  color: var(--color-primary);
+}
+.selo-em-transito {
+  background: #fef3c7;
+  color: var(--aviso);
+}
+.selo-entregue {
+  background: #d1fae5;
+  color: var(--sucesso);
+}
+.selo-problematica {
+  background: var(--erro-suave);
+  color: var(--erro);
+}
+.selo-cancelada {
+  background: var(--erro-suave);
+  color: var(--erro);
+}
+
 .barra-topo {
   display: flex;
   align-items: center;

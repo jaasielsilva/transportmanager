@@ -4,30 +4,19 @@ import com.jaasielsilva.transportmanager.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import org.hibernate.annotations.TenantId;
 
 /**
- * Molde do kit — features/carga/entity/Carga.java
- *
- * ENTITY DE REFERENCIA. Toda entity de negocio do projeto se parece com esta;
- * copie a estrutura em vez de inventar outra.
- *
- * Tres coisas aqui nao sao decoracao:
- *
- * 1. {@code @TenantId} no empresaId — o Hibernate passa a filtrar findAll(),
- *    JPQL e derived queries por empresa_id sozinho. Esquecer o filtro deixa de
- *    ser possivel. A coluna vira imutavel, o que esta certo: um registro nunca
- *    muda de empresa.
- *
- * 2. deletedAt — exclusao e logica. O cliente que apagou por engano liga no dia
- *    seguinte, e "restaurar" precisa ser um UPDATE, nao um restore de backup.
- *
- * 3. deletedSeq — a sentinela que faz UNIQUE e soft delete conviverem. Com
- *    UNIQUE (empresa_id, documento) puro, um registro excluido continua
- *    ocupando o documento e o cliente nao consegue recadastrar. O service
- *    grava o proprio id aqui ao excluir, entao cada versao excluida ocupa uma
- *    combinacao diferente e so a viva (deletedSeq = 0) disputa a chave.
+ * Entity de Cargas de Transporte - Evoluída do CRUD genérico do kit
+ * 
+ * Campos específicos de logística adicionados:
+ * - Endereços de origem e destino
+ * - Peso e valor do frete
+ * - Status específicos de transporte
+ * - Integração com motoristas e clientes
+ * - Prazos e rastreamento
  */
 @Entity
 @Table(name = "cargas")
@@ -37,6 +26,7 @@ public class Carga extends BaseEntity {
     @Column(name = "empresa_id", nullable = false)
     private Long empresaId;
 
+    // Campos originais do CRUD genérico (mantidos para compatibilidade)
     @Column(nullable = false, length = 150)
     private String nome;
 
@@ -46,7 +36,6 @@ public class Carga extends BaseEntity {
     @Column(length = 20)
     private String telefone;
 
-    /** Documento do cadastro (CPF/CNPJ). Unico por empresa, nunca global. */
     @Column(length = 20)
     private String documento;
 
@@ -56,13 +45,63 @@ public class Carga extends BaseEntity {
     @Column(nullable = false)
     private boolean ativo = true;
 
+    // Campos específicos de transporte
+    @Column(name = "origem_endereco", length = 255)
+    private String origemEndereco;
+
+    @Column(name = "origem_cidade", length = 100)
+    private String origemCidade;
+
+    @Column(name = "origem_uf", length = 2)
+    private String origemUf;
+
+    @Column(name = "destino_endereco", length = 255)
+    private String destinoEndereco;
+
+    @Column(name = "destino_cidade", length = 100)
+    private String destinoCidade;
+
+    @Column(name = "destino_uf", length = 2)
+    private String destinoUf;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal peso;
+
+    @Column(name = "valor_frete", precision = 12, scale = 2)
+    private BigDecimal valorFrete;
+
+    @Column(length = 20)
+    private String status = "PENDENTE";
+
+    @Column(name = "motorista_id")
+    private Long motoristaId;
+
+    @Column(name = "cliente_id")
+    private Long clienteId;
+
+    @Column(name = "data_coleta")
+    private LocalDateTime dataColeta;
+
+    @Column(name = "data_entrega_prevista")
+    private LocalDateTime dataEntregaPrevista;
+
+    @Column(name = "data_entrega_real")
+    private LocalDateTime dataEntregaReal;
+
+    @Column(name = "distancia_km")
+    private Integer distanciaKm;
+
+    @Column(name = "tempo_estimado_minutos")
+    private Integer tempoEstimadoMinutos;
+
+    // Campos de soft delete (padrão do kit)
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    /** 0 enquanto vivo; recebe o proprio id na exclusao (ver javadoc da classe). */
     @Column(name = "deleted_seq", nullable = false)
     private long deletedSeq;
 
+    // Getters e Setters dos campos originais
     public Long getEmpresaId() { return empresaId; }
     public void setEmpresaId(Long v) { this.empresaId = v; }
     public String getNome() { return nome; }
@@ -81,4 +120,38 @@ public class Carga extends BaseEntity {
     public void setDeletedAt(LocalDateTime v) { this.deletedAt = v; }
     public long getDeletedSeq() { return deletedSeq; }
     public void setDeletedSeq(long v) { this.deletedSeq = v; }
+
+    // Getters e Setters dos campos específicos de transporte
+    public String getOrigemEndereco() { return origemEndereco; }
+    public void setOrigemEndereco(String v) { this.origemEndereco = v; }
+    public String getOrigemCidade() { return origemCidade; }
+    public void setOrigemCidade(String v) { this.origemCidade = v; }
+    public String getOrigemUf() { return origemUf; }
+    public void setOrigemUf(String v) { this.origemUf = v; }
+    public String getDestinoEndereco() { return destinoEndereco; }
+    public void setDestinoEndereco(String v) { this.destinoEndereco = v; }
+    public String getDestinoCidade() { return destinoCidade; }
+    public void setDestinoCidade(String v) { this.destinoCidade = v; }
+    public String getDestinoUf() { return destinoUf; }
+    public void setDestinoUf(String v) { this.destinoUf = v; }
+    public BigDecimal getPeso() { return peso; }
+    public void setPeso(BigDecimal v) { this.peso = v; }
+    public BigDecimal getValorFrete() { return valorFrete; }
+    public void setValorFrete(BigDecimal v) { this.valorFrete = v; }
+    public String getStatus() { return status; }
+    public void setStatus(String v) { this.status = v; }
+    public Long getMotoristaId() { return motoristaId; }
+    public void setMotoristaId(Long v) { this.motoristaId = v; }
+    public Long getClienteId() { return clienteId; }
+    public void setClienteId(Long v) { this.clienteId = v; }
+    public LocalDateTime getDataColeta() { return dataColeta; }
+    public void setDataColeta(LocalDateTime v) { this.dataColeta = v; }
+    public LocalDateTime getDataEntregaPrevista() { return dataEntregaPrevista; }
+    public void setDataEntregaPrevista(LocalDateTime v) { this.dataEntregaPrevista = v; }
+    public LocalDateTime getDataEntregaReal() { return dataEntregaReal; }
+    public void setDataEntregaReal(LocalDateTime v) { this.dataEntregaReal = v; }
+    public Integer getDistanciaKm() { return distanciaKm; }
+    public void setDistanciaKm(Integer v) { this.distanciaKm = v; }
+    public Integer getTempoEstimadoMinutos() { return tempoEstimadoMinutos; }
+    public void setTempoEstimadoMinutos(Integer v) { this.tempoEstimadoMinutos = v; }
 }

@@ -9,6 +9,9 @@ import { ConfirmacaoService } from '../../../shared/confirmacao/confirmacao.serv
 import { EstadoComponent } from '../../../shared/estado/estado.component';
 import { CargaResumo } from '../models/carga.model';
 import { CargaService } from '../services/carga.service';
+import { classeStatus as classeDeStatus, rotuloStatus as rotuloDeStatus } from '../carga.status';
+
+const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
 /**
  * Molde do kit — LISTAGEM DE REFERENCIA. Copie esta estrutura em toda
@@ -30,7 +33,7 @@ import { CargaService } from '../services/carga.service';
     <div class="barra-topo">
       <div>
         <h1>Cargas</h1>
-        <p class="texto-suave">{{ pagina().totalElements }} cadastrado(s)</p>
+        <p class="texto-suave">{{ pagina().totalElements }} cadastrada(s)</p>
       </div>
 
       <div style="display: flex; gap: 8px; align-items: center">
@@ -52,11 +55,11 @@ import { CargaService } from '../services/carga.service';
           [carregando]="carregando()"
           [erro]="erro()"
           [vazio]="pagina().totalElements === 0"
-          [tituloVazio]="termo() ? 'Nenhum resultado' : 'Nenhum carga ainda'"
+          [tituloVazio]="termo() ? 'Nenhum resultado' : 'Nenhuma carga ainda'"
           [textoVazio]="
             termo()
               ? 'Tente outro termo de busca.'
-              : 'Cadastre o primeiro para comecar a usar o sistema.'
+              : 'Cadastre a primeira para comecar a usar o sistema.'
           "
           [ctaVazio]="termo() || somenteLeitura() ? null : 'Cadastrar carga'"
           (acao)="aoAgirNoEstado()"
@@ -66,9 +69,10 @@ import { CargaService } from '../services/carga.service';
           <thead>
             <tr>
               <th>Nome</th>
-              <th>E-mail</th>
-              <th>Telefone</th>
-              <th>Situacao</th>
+              <th>Origem</th>
+              <th>Destino</th>
+              <th>Valor</th>
+              <th>Status</th>
               <th style="width: 1%"></th>
             </tr>
           </thead>
@@ -76,11 +80,12 @@ import { CargaService } from '../services/carga.service';
             @for (item of pagina().content; track item.id) {
               <tr>
                 <td><a [routerLink]="[item.id]">{{ item.nome }}</a></td>
-                <td>{{ item.email ?? '—' }}</td>
-                <td>{{ item.telefone ?? '—' }}</td>
+                <td>{{ rotuloCidade(item.origemCidade, item.origemUf) }}</td>
+                <td>{{ rotuloCidade(item.destinoCidade, item.destinoUf) }}</td>
+                <td>{{ formatarMoeda(item.valorFrete) }}</td>
                 <td>
-                  <span class="selo" [class]="item.ativo ? 'selo-ativo' : 'selo-inativo'">
-                    {{ item.ativo ? 'ativo' : 'inativo' }}
+                  <span class="selo" [class]="classeStatus(item.status)">
+                    {{ rotuloStatus(item.status) }}
                   </span>
                 </td>
                 <td style="white-space: nowrap">
@@ -168,6 +173,25 @@ export class CargaListaPage {
     return this.auth.temRole('TENANT_ADMIN') && !this.somenteLeitura();
   }
 
+  protected rotuloCidade(cidade: string | null, uf: string | null): string {
+    if (!cidade) {
+      return '—';
+    }
+    return uf ? `${cidade}/${uf}` : cidade;
+  }
+
+  protected rotuloStatus(status: string): string {
+    return rotuloDeStatus(status);
+  }
+
+  protected classeStatus(status: string): string {
+    return classeDeStatus(status);
+  }
+
+  protected formatarMoeda(valor: number | null): string {
+    return valor == null ? '—' : moeda.format(valor);
+  }
+
   protected buscar(termo: string): void {
     this.digitou.next(termo);
   }
@@ -194,7 +218,7 @@ export class CargaListaPage {
     }
 
     this.service.excluir(item.id).subscribe(() => {
-      this.toast.sucesso('Carga excluido.');
+      this.toast.sucesso('Carga excluída.');
       // Recarrega a MESMA pagina: excluir o ultimo item de uma pagina deixaria
       // a tela vazia com o botao "proxima" ainda ativo.
       this.carregar(this.pagina().page);
