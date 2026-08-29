@@ -2,6 +2,8 @@ package com.jaasielsilva.transportmanager.features.geo;
 
 import com.jaasielsilva.transportmanager.exception.GatewayGeoException;
 import com.jaasielsilva.transportmanager.features.geo.dto.GeoDtos.EstimativaRota;
+import java.net.URI;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,27 +11,37 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Gateway OpenRouteService (Matrix API). Unica classe que conhece o JSON do ORS.
+ * Gateway OpenRouteService. Unica classe que conhece o JSON do ORS.
  *
  * Troca consciente de provedor (Google -> OpenRouteService): o Google Maps
- * exige cartao de credito/creditos; o ORS tem plano gratis sem cartao, com a
- * API de Matrix incluida (~2.500-8.000 req/dia, base OpenStreetMap). A regra de
- * seguranca e a mesma: a API key vive so no backend, por variavel de ambiente.
+ * exige cartao de credito/creditos; o ORS tem plano gratis sem cartao (base
+ * OpenStreetMap). A regra de seguranca e a mesma: a API key vive so no backend,
+ * por variavel de ambiente.
  *
  * A interface {@link GatewayGeo} nao muda; quem fala com o ORS e esta classe.
- * Endpoint: POST /v2/matrix/driving-car com locations (origem/destino) e
- * metrics [distance, duration]. Celula null na matriz = sem rota entre os
- * pontos — nao e erro, e a chamada funcionou.
+ * A Matrix do ORS NAO aceita endereco em texto — so coordenadas [lng, lat].
+ * Entao o fluxo e de 2 passos:
+ *   1. Geocodificar cada ponta (GET /pelias/v1/search?text=...) -> [lng, lat].
+ *   2. Matrix driving-car com as coordenadas
+ *      (POST /openrouteservice/v2/matrix/driving-car).
+ * Sem resultado na geocodificacao, ou celula null na matriz = sem rota entre os
+ * pontos — a chamada funcionou, nao e erro.
+ *
+ * O host novo e o api.heigit.org (o antigo api.openrouteservice.org foi
+ * descontinuado em 24/08/2026). O caminho de cada servico muda: routing vira
+ * /openrouteservice/v2/... e geocoding vira /pelias/v1/....
  */
 @Component
 public class OpenRouteServiceGeoGateway implements GatewayGeo {
 
     private static final Logger log = LoggerFactory.getLogger(OpenRouteServiceGeoGateway.class);
 
-    private static final String BASE_URL = "https://api.openrouteservice.org";
-    private static final String CAMINHO = "/v2/matrix/driving-car";
+    private static final String BASE_URL = "https://api.heigit.org";
+    private static final String CAMINHO_GEOCODE = "/pelias/v1/search";
+    private static final String CAMINHO_MATRIX = "/openrouteservice/v2/matrix/driving-car";
 
     private final String apiKey;
     private final RestClient restClient;
@@ -47,13 +59,22 @@ public class OpenRouteServiceGeoGateway implements GatewayGeo {
                     "OPENROUTESERVICE_API_KEY nao configurada. Configure a variavel de ambiente para usar o calculo de rota.");
         }
 
+        double[] origemCoordenadas = geocodificar(origem);
+        double[] destinoCoordenadas = geocodificar(destino);
+        if (origemCoordenadas == null || destinoCoordenadas == null) {
+            // Endereco sem correspondencia no ORS = sem rota; a chamada funcionou.
+            log.info("OpenRouteService sem geocodificacao: origem={} destino={}", origem, destino);
+            return new EstimativaRota(null, null);
+        }
+
         RespostaMatrix resposta;
         try {
             resposta = restClient.post()
-                    .uri(CAMINHO)
+                    .uri(CAMINHO_MATRIX)
                     .contentType(MediaType.APPLICATION_JSON)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                    .body(new RequisicaoMatrix(new String[]{origem, destino},
+                    .body(new RequisicaoMatrix(
+                            new double[][]{origemCoordenadas, destinoCoordenadas},
                             new String[]{"distance", "duration"}))
                     .retrieve()
                     .body(RespostaMatrix.class);
@@ -77,9 +98,42 @@ public class OpenRouteServiceGeoGateway implements GatewayGeo {
             return new EstimativaRota(null, null);
         }
 
-        return new EstimativaRota(
-                metrosParaKm(distancia),
-                segundosParaMinutos(duracao));
+        int distanciaKm = metrosParaKm(distancia);
+        int tempoMin = segundosParaMinutos(duracao);
+        log.info("Rota calculada: origem={} destino={} distanciaKm={} tempoMin={}",
+                origem, destino, distanciaKm, tempoMin);
+        return new EstimativaRota(distanciaKm, tempoMin);
+    }
+
+    /**
+     * Endereco -> [lng, lat] via geocoding do ORS. Sem correspondencia -> null
+     * (rota inexistente, o front avisa "nao foi possivel tracar rota"). Falha
+     * HTTP/timeout do ORS -> excecao (502).
+     */
+    private double[] geocodificar(String endereco) {
+        try {
+            URI uri = UriComponentsBuilder.fromUriString(CAMINHO_GEOCODE)
+                    .queryParam("text", endereco)
+                    .build().encode().toUri();
+            RespostaGeocoding resposta = restClient.get()
+                    .uri(uri)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                    .retrieve()
+                    .body(RespostaGeocoding.class);
+            if (resposta == null || resposta.features == null || resposta.features.isEmpty()) {
+                log.info("OpenRouteService sem resultado de geocodificacao: {}", endereco);
+                return null;
+            }
+            double[] coordenadas = resposta.features.get(0).geometry.coordinates;
+            if (coordenadas == null || coordenadas.length < 2) {
+                log.info("OpenRouteService sem coordenadas na geocodificacao: {}", endereco);
+                return null;
+            }
+            return new double[]{coordenadas[0], coordenadas[1]};
+        } catch (Exception e) {
+            log.warn("Falha na geocodificacao OpenRouteService: {}", endereco, e);
+            throw new GatewayGeoException("Nao foi possivel localizar o endereco.", e);
+        }
     }
 
     /**
@@ -104,6 +158,10 @@ public class OpenRouteServiceGeoGateway implements GatewayGeo {
     }
 
     /** Estruturas do JSON do ORS — so o que a gente usa. */
-    private record RequisicaoMatrix(String[] locations, String[] metrics) {}
+    private record RequisicaoMatrix(double[][] locations, String[] metrics) {}
     private record RespostaMatrix(Double[][] distances, Double[][] durations) {}
+    private record RespostaGeocoding(List<Feature> features) {
+        private record Feature(Geometria geometry) {}
+        private record Geometria(double[] coordinates) {}
+    }
 }

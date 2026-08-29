@@ -43,9 +43,10 @@ spring:
     properties.mail.smtp.starttls.enable: true
 
   # Timeouts do RestClient.Builder auto-configurado (usado no gateway de rota —
-  # Google Maps / OpenRouteService). Curtos de proposito: o botao "Calcular
-  # rota" do form espera na hora — 10s de leitura e o teto antes do toast de
-  # erro.
+  # OpenRouteService, host api.heigit.org). Curtos de proposito: o botao
+  # "Calcular rota" do form espera na hora. O teto de 10s e POR chamada; o
+  # gateway faz 3 chamadas sequenciais (geocode de origem, geocode de destino e
+  # a Matrix), entao o pior caso e ~30s antes do toast de erro.
   http:
     client:
       connect-timeout: 5s
