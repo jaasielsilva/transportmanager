@@ -515,6 +515,8 @@ Padrões para necessidades que todo módulo acaba tendo — sempre atrás de int
 | E-mail transacional | Interface `EmailService`; implementação por provider (SMTP / SendGrid / SES). Envio assíncrono (`@Async`); templates versionados no repo. Usos: convite, esqueci-senha, avisos de billing |
 | Upload de arquivos | Interface `FileStorageService`; storage S3-compatível — **nunca** blob no banco. Caminho: `{empresa_id}/{modulo}/{uuid}`. Validar tipo e tamanho no upload; download via URL assinada |
 | Jobs agendados | `@Scheduled`; com mais de 1 instância, **ShedLock** para não executar em dobro. Jobs idempotentes, com log de início/fim. Usos: purge de tenants, retry de e-mails, expiração de trial |
+| Geolocalização / rotas | Interface `GatewayGeo`; implementação `OpenRouteServiceGeoGateway` (RestClient do spring-web, zero dependência nova) no host `api.heigit.org` (o antigo `api.openrouteservice.org` foi descontinuado em 08/2026). A Matrix **não aceita endereço em texto** — o gateway **geocodifica** cada ponta (`/pelias/v1/search`) e então calcula a Matrix (`/openrouteservice/v2/matrix/driving-car`); plano grátis, sem cartão. **Só o backend conhece a API key** (`OPENROUTESERVICE_API_KEY`, env var) — nunca vai ao bundle do frontend. Sem geocodificação ou célula `null` na matriz = sem rota (campos ficam vazios, sem erro); falha do upstream vira `GatewayGeoException` → 502. Usos: estimar distância/tempo da rota no form de carga (`POST /cargas/calcular-rota`) |
+| Consulta de CEP | Interface `GatewayCep`; implementação `ViaCepGateway` (RestClient, **gratuito e sem chave** — coerente com o OpenRouteService). `GET /api/v1/ceps/{cep}` (com `@Pattern \d{8}`) → endereço/cidade/UF; CEP inexistente devolve `data: null` (o form avisa, não é 404); falha do upstream vira `GatewayCepException` → 502. Uso: **autofill do form de carga** — o CEP preenche origem/destino para o cálculo de rota traçar exato. CEP é transiente no front (não persiste na carga) |
 
 ---
 
@@ -647,6 +649,7 @@ Regras de operação do sistema — valem para todo projeto do padrão.
 > A partir do go-live, **sempre dois ambientes no ar**: nada chega à `main` sem ter sido validado em homologação.
 
 - Secrets **somente** via env vars / `.env` (que fica no `.gitignore`) — nunca commitados
+- `OPENROUTESERVICE_API_KEY` (geocoding + Matrix do OpenRouteService, plano grátis sem cartão) — **só no backend**; sem ela o `calcular-rota` responde 502 de propósito (fail-fast). Nunca colocar a key no `environment.ts` do frontend
 - Seeds de dev: migration separada `R__seed_dev.sql` ou `CommandLineRunner` condicionado ao profile `dev`
 - Frontend: `environment.ts` (dev) / `environment.prod.ts`
 

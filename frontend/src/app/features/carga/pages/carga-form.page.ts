@@ -9,7 +9,7 @@ import {
   rotuloStatus as rotuloDeStatus,
   STATUS_TRANSICOES,
 } from '../carga.status';
-import { CargaSalvar } from '../models/carga.model';
+import { CargaCalcularRota, CargaSalvar } from '../models/carga.model';
 import { CargaService } from '../services/carga.service';
 
 /**
@@ -116,6 +116,17 @@ import { CargaService } from '../services/carga.service';
       <h2>Transporte</h2>
 
       <label class="campo">
+        <span>CEP de origem @if (cepOrigemCarregando()) { <em class="texto-suave">· buscando...</em> }</span>
+        <input
+          formControlName="origemCep"
+          inputmode="numeric"
+          maxlength="8"
+          placeholder="00000000"
+          (blur)="preencherCep('origem')"
+        />
+      </label>
+
+      <label class="campo">
         <span>Endereco de origem</span>
         <input formControlName="origemEndereco" />
       </label>
@@ -133,6 +144,17 @@ import { CargaService } from '../services/carga.service';
           <input formControlName="origemUf" maxlength="2" />
         </label>
       </div>
+
+      <label class="campo">
+        <span>CEP de destino @if (cepDestinoCarregando()) { <em class="texto-suave">· buscando...</em> }</span>
+        <input
+          formControlName="destinoCep"
+          inputmode="numeric"
+          maxlength="8"
+          placeholder="00000000"
+          (blur)="preencherCep('destino')"
+        />
+      </label>
 
       <label class="campo">
         <span>Endereco de destino</span>
@@ -187,7 +209,22 @@ import { CargaService } from '../services/carga.service';
         <label class="campo" style="flex: 1">
           <span>Tempo estimado (min)</span>
           <input type="number" min="0" step="1" formControlName="tempoEstimadoMinutos" />
+          @if (tempoMinutos > 0) {
+            <span class="texto-suave">{{ formatarTempo(tempoMinutos) }}</span>
+          }
         </label>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px">
+        <span class="texto-suave">Origem e destino preenchidos? Preencha os campos estimados.</span>
+        <button
+          type="button"
+          class="btn btn-secundario"
+          [disabled]="calculandoRota() || somenteLeitura()"
+          (click)="calcularRota()"
+        >
+          {{ calculandoRota() ? 'Calculando...' : 'Calcular rota' }}
+        </button>
       </div>
 
       <label class="campo" style="display: flex; align-items: center; gap: 8px">
@@ -221,6 +258,10 @@ export class CargaFormPage {
   private readonly id = Number(this.rota.snapshot.paramMap.get('id'));
 
   protected readonly salvando = signal(false);
+  protected readonly calculandoRota = signal(false);
+  /** Autofill por CEP (transiente — nao persiste); um por lado para nao travar o outro. */
+  protected readonly cepOrigemCarregando = signal(false);
+  protected readonly cepDestinoCarregando = signal(false);
   protected readonly somenteLeitura = this.auth.somenteLeitura;
   protected readonly status = signal<string | null>(null);
 
@@ -240,9 +281,11 @@ export class CargaFormPage {
     documento: ['', [Validators.maxLength(20)]],
     observacao: ['', [Validators.maxLength(500)]],
     ativo: [true],
+    origemCep: ['', [Validators.maxLength(8)]],
     origemEndereco: ['', [Validators.maxLength(255)]],
     origemCidade: ['', [Validators.required, Validators.maxLength(100)]],
     origemUf: ['', [Validators.maxLength(2)]],
+    destinoCep: ['', [Validators.maxLength(8)]],
     destinoEndereco: ['', [Validators.maxLength(255)]],
     destinoCidade: ['', [Validators.required, Validators.maxLength(100)]],
     destinoUf: ['', [Validators.maxLength(2)]],
@@ -298,6 +341,28 @@ export class CargaFormPage {
     return classeDeStatus(status);
   }
 
+  /** Valor bruto do campo tempo (min) — so para exibir em horas na tela. */
+  protected get tempoMinutos(): number {
+    const v = Number(this.form.controls['tempoEstimadoMinutos'].value);
+    return Number.isFinite(v) ? v : 0;
+  }
+
+  /** 2279 min -> "37 h 59 min". So exibicao: o que grava continua em minutos. */
+  protected formatarTempo(minutos: number): string {
+    if (!minutos || minutos <= 0) {
+      return '';
+    }
+    const h = Math.floor(minutos / 60);
+    const m = minutos % 60;
+    if (h === 0) {
+      return `${m} min`;
+    }
+    if (m === 0) {
+      return `${h} h`;
+    }
+    return `${h} h ${m} min`;
+  }
+
   protected invalido(campo: 'nome' | 'email' | 'documento' | 'origemCidade' | 'destinoCidade'): boolean {
     const controle = this.form.controls[campo];
     return controle.invalid && controle.touched;
@@ -340,6 +405,105 @@ export class CargaFormPage {
       error: () => {
         // O toast generico ja saiu no interceptor.
         this.salvando.set(false);
+      },
+    });
+  }
+
+  /**
+   * Chama o endpoint helper de rota (Distance Matrix). A estimativa nao e
+   * salva aqui — o botao so preenche distancia/tempo no form; quem grava e o
+   * "Salvar" normal. Se o Google nao achar rota (nulls), avisa sem apagar o
+   * que ja esta digitado. 502 (key ausente / Google fora do ar) ja tostou no
+   * interceptor; 400 por campo vira erro inline, como no salvar.
+   */
+  protected calcularRota(): void {
+    if (this.calculandoRota() || this.somenteLeitura()) {
+      return;
+    }
+
+    const origem = this.form.controls['origemCidade'];
+    const destino = this.form.controls['destinoCidade'];
+    if (origem.invalid || destino.invalid) {
+      origem.markAsTouched();
+      destino.markAsTouched();
+      return;
+    }
+
+    const raw = this.form.getRawValue();
+    const dados: CargaCalcularRota = {
+      origemCidade: raw.origemCidade,
+      origemUf: raw.origemUf || null,
+      origemEndereco: raw.origemEndereco || null,
+      destinoCidade: raw.destinoCidade,
+      destinoUf: raw.destinoUf || null,
+      destinoEndereco: raw.destinoEndereco || null,
+    };
+
+    this.calculandoRota.set(true);
+    this.service.calcularRota(dados).subscribe({
+      next: (estimativa) => {
+        this.calculandoRota.set(false);
+        if (estimativa.distanciaKm != null && estimativa.tempoEstimadoMinutos != null) {
+          this.form.patchValue({
+            distanciaKm: String(estimativa.distanciaKm),
+            tempoEstimadoMinutos: String(estimativa.tempoEstimadoMinutos),
+          });
+          this.toast.sucesso('Rota calculada.');
+        } else {
+          this.toast.aviso('Nao foi possivel tracar rota entre esses enderecos.');
+        }
+      },
+      error: (e) => {
+        // 502 ja tostou no interceptor; 400 por campo vira erro inline.
+        this.calculandoRota.set(false);
+        this.aplicarErrosDoServidor(e.error?.errors);
+      },
+    });
+  }
+
+  /**
+   * Autofill por CEP: preenche endereco/cidade/UF para o "Calcular rota" tracar
+   * com precisao. O CEP e transiente (nao persiste na carga) — so conveniencia
+   * de preenchimento. CEP inexistente (null do backend) vira aviso, sem apagar
+   * o que ja esta digitado. 502 do ViaCEP ja tostou no interceptor.
+   */
+  protected preencherCep(lado: 'origem' | 'destino'): void {
+    if (this.somenteLeitura()) {
+      return;
+    }
+    const carregando = lado === 'origem' ? this.cepOrigemCarregando : this.cepDestinoCarregando;
+    if (carregando()) {
+      return;
+    }
+
+    const cep = (this.form.controls[lado === 'origem' ? 'origemCep' : 'destinoCep'].value ?? '')
+      .replace(/\D/g, '');
+    if (cep.length !== 8) {
+      if (cep) {
+        this.toast.aviso('Informe um CEP com 8 digitos.');
+      }
+      return;
+    }
+
+    carregando.set(true);
+    this.service.buscarCep(cep).subscribe({
+      next: (dados) => {
+        carregando.set(false);
+        if (!dados) {
+          this.toast.aviso('CEP nao encontrado.');
+          return;
+        }
+        const prefixo = lado === 'origem' ? 'origem' : 'destino';
+        this.form.patchValue({
+          [`${prefixo}Endereco`]: dados.logradouro || '',
+          [`${prefixo}Cidade`]: dados.cidade || '',
+          [`${prefixo}Uf`]: dados.uf || '',
+        });
+        this.toast.sucesso('Endereco preenchido pelo CEP.');
+      },
+      error: () => {
+        // O toast generico ja saiu no interceptor.
+        carregando.set(false);
       },
     });
   }

@@ -42,6 +42,16 @@ spring:
     password: ${MAIL_PASSWORD:}
     properties.mail.smtp.starttls.enable: true
 
+  # Timeouts do RestClient.Builder auto-configurado (usado no gateway de rota —
+  # OpenRouteService, host api.heigit.org). Curtos de proposito: o botao
+  # "Calcular rota" do form espera na hora. O teto de 10s e POR chamada; o
+  # gateway faz 3 chamadas sequenciais (geocode de origem, geocode de destino e
+  # a Matrix), entao o pior caso e ~30s antes do toast de erro.
+  http:
+    client:
+      connect-timeout: 5s
+      read-timeout: 10s
+
   servlet.multipart:
     max-file-size: 10MB
     max-request-size: 10MB
@@ -86,6 +96,13 @@ app:
     secret: ${JWT_SECRET:troque-em-producao-min-64-chars-aleatorios-openssl-rand-base64-64}
     access-token-minutes: 15
     refresh-token-days: 7
+  openrouteservice:
+    # API key do OpenRouteService (Matrix API, plano gratis sem cartao) —
+    # SOMENTE no backend. Nunca vai para o bundle do frontend (a regra do
+    # projeto: secret so por variavel de ambiente).
+    # Default vazio de proposito: sem a key, o endpoint de rota responde 502
+    # (GatewayGeoException) em vez de subir com valor falso.
+    api-key: ${OPENROUTESERVICE_API_KEY:}
 
 management:
   endpoints.web.exposure.include: health,info,prometheus

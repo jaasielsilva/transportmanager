@@ -44,7 +44,7 @@ Se um pilar ficar de fora, a feature **não está pronta**.
 | Backend | ✅ base, tenant, auth, billing, `/platform` |
 | Frontend | ✅ shell, guards, interceptors, toast, design tokens |
 | Auth (login + refresh + RBAC) | ✅ back e front (login, criar conta, esqueci senha, convite, alterar senha logado em `/minha-conta`) — `POST /api/v1/me/senha` mora no `UsuarioController` porque `/api/v1/auth/**` é público, sem role exigida (toda role troca a própria senha), derruba todas as sessões ao trocar |
-| carga (CRUD ref) | ✅ back e front (lista + form, quota, soft delete) |
+| carga (CRUD ref) | ✅ back e front (lista + form, quota, soft delete) + **estimativa de rota**: geocoding + Matrix do OpenRouteService (`api.heigit.org`) via `features/geo` (`POST /cargas/calcular-rota`), API key só no backend (`OPENROUTESERVICE_API_KEY`, plano grátis sem cartão), falha do upstream → 502; + **autofill por CEP** (ViaCEP via `features/cep`, `GET /ceps/{cep}`, gratuito sem chave) |
 | Ciclo comercial | ✅ dunning, banner, `/assinatura`, `/plano` |
 | Painel do dono (`/plataforma`) | ✅ métricas, tenants, ficha, quotas, webhooks |
 
@@ -55,6 +55,9 @@ Se um pilar ficar de fora, a feature **não está pronta**.
 | `GatewayBilling` do provedor (Stripe/Asaas/MP) | 🔲 |
 | Impersonação ("entrar como o cliente") | 🔲 |
 | Listagem/desativação de usuários (só o convite existe) | 🔲 |
+| Fase 2 — atribuição de transporte: `Veiculo`/`Motorista`, role `MOTORISTA`, status `ACEITA`, aceite/recusa com motivo | 🔲 |
+| Fase 3 — execução: `Ocorrencia` + comprovante de entrega (upload) | 🔲 |
+| Fase 4 — rastreamento em tempo real (telemetria, separada da Distance Matrix) | 🔲 |
 | {módulo do projeto} | 🔲 |
 
 ### Referência viva
