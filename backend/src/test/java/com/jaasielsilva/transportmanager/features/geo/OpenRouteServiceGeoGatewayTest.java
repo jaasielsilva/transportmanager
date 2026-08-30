@@ -128,6 +128,67 @@ class OpenRouteServiceGeoGatewayTest {
                 .hasMessageContaining("OPENROUTESERVICE_API_KEY");
     }
 
+    @Test
+    @DisplayName("tracar: geocode das duas pontas + directions vira geometria [lat,lng]")
+    void tracaRotaComGeometriaInvertida() {
+        server.expect(geocodificacaoDe("Sao Paulo, SP, Brasil"))
+                .andRespond(withSuccess(geojsonDe(LNG_SAO_PAULO, LAT_SAO_PAULO), MediaType.APPLICATION_JSON));
+        server.expect(geocodificacaoDe("Campinas, SP, Brasil"))
+                .andRespond(withSuccess(geojsonDe(LNG_CAMPINAS, LAT_CAMPINAS), MediaType.APPLICATION_JSON));
+        server.expect(directionsCom(LNG_SAO_PAULO, LAT_SAO_PAULO, LNG_CAMPINAS, LAT_CAMPINAS))
+                .andRespond(withSuccess("""
+                        {
+                          "features": [
+                            {
+                              "geometry": {
+                                "coordinates": [[%s, %s], [%s, %s]]
+                              }
+                            }
+                          ]
+                        }
+                        """.formatted(LNG_SAO_PAULO, LAT_SAO_PAULO, LNG_CAMPINAS, LAT_CAMPINAS),
+                        MediaType.APPLICATION_JSON));
+
+        var geometria = gateway.tracar("Sao Paulo, SP, Brasil", "Campinas, SP, Brasil");
+
+        assertThat(geometria).hasSize(2);
+        // GeoJSON entrega [lng, lat]; o gateway devolve [lat, lng] (ordem do Leaflet).
+        assertThat(geometria.get(0)).containsExactly(LAT_SAO_PAULO, LNG_SAO_PAULO);
+        assertThat(geometria.get(1)).containsExactly(LAT_CAMPINAS, LNG_CAMPINAS);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("tracar: endereco sem geocodificacao devolve lista vazia, nao erro")
+    void tracarSemGeocodificacaoDevolveListaVazia() {
+        server.expect(geocodificacaoDe("Lugar Inexistente"))
+                .andRespond(withSuccess("{\"features\": []}", MediaType.APPLICATION_JSON));
+        server.expect(geocodificacaoDe("Outro Lugar"))
+                .andRespond(withSuccess("{\"features\": []}", MediaType.APPLICATION_JSON));
+
+        var geometria = gateway.tracar("Lugar Inexistente", "Outro Lugar");
+
+        assertThat(geometria).isEmpty();
+        server.verify();
+    }
+
+    /** POST /openrouteservice/v2/directions/driving-car/geojson com as coordenadas geocodificadas. */
+    private static RequestMatcher directionsCom(double lngOrigem, double latOrigem,
+                                                double lngDestino, double latDestino) {
+        return request -> {
+            assertThat(request.getMethod()).isEqualTo(POST);
+            assertThat(request.getURI().getPath()).isEqualTo("/openrouteservice/v2/directions/driving-car/geojson");
+            assertThat(request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION))
+                    .isEqualTo("Bearer " + CHAVE);
+
+            String corpo = ((MockClientHttpRequest) request).getBodyAsString();
+            assertThat(corpo).contains(String.valueOf(lngOrigem));
+            assertThat(corpo).contains(String.valueOf(latOrigem));
+            assertThat(corpo).contains(String.valueOf(lngDestino));
+            assertThat(corpo).contains(String.valueOf(latDestino));
+        };
+    }
+
     /** GET /pelias/v1/search?text=<endereco> com Authorization Bearer. */
     private static RequestMatcher geocodificacaoDe(String endereco) {
         return request -> {

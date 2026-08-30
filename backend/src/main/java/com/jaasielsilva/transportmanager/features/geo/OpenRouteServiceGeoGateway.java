@@ -3,6 +3,7 @@ package com.jaasielsilva.transportmanager.features.geo;
 import com.jaasielsilva.transportmanager.exception.GatewayGeoException;
 import com.jaasielsilva.transportmanager.features.geo.dto.GeoDtos.EstimativaRota;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +43,7 @@ public class OpenRouteServiceGeoGateway implements GatewayGeo {
     private static final String BASE_URL = "https://api.heigit.org";
     private static final String CAMINHO_GEOCODE = "/pelias/v1/search";
     private static final String CAMINHO_MATRIX = "/openrouteservice/v2/matrix/driving-car";
+    private static final String CAMINHO_DIRECTIONS = "/openrouteservice/v2/directions/driving-car/geojson";
 
     private final String apiKey;
     private final RestClient restClient;
@@ -105,6 +107,53 @@ public class OpenRouteServiceGeoGateway implements GatewayGeo {
         return new EstimativaRota(distanciaKm, tempoMin);
     }
 
+    @Override
+    public List<double[]> tracar(String origem, String destino) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new GatewayGeoException(
+                    "OPENROUTESERVICE_API_KEY nao configurada. Configure a variavel de ambiente para usar o calculo de rota.");
+        }
+
+        double[] origemCoordenadas = geocodificar(origem);
+        double[] destinoCoordenadas = geocodificar(destino);
+        if (origemCoordenadas == null || destinoCoordenadas == null) {
+            log.info("OpenRouteService sem geocodificacao para tracar rota: origem={} destino={}", origem, destino);
+            return List.of();
+        }
+
+        RespostaDirections resposta;
+        try {
+            resposta = restClient.post()
+                    .uri(CAMINHO_DIRECTIONS)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                    .body(new RequisicaoDirections(new double[][]{origemCoordenadas, destinoCoordenadas}))
+                    .retrieve()
+                    .body(RespostaDirections.class);
+        } catch (Exception e) {
+            log.warn("Falha ao consultar Directions do OpenRouteService: origem={} destino={}", origem, destino, e);
+            throw new GatewayGeoException("Nao foi possivel tracar a rota no OpenRouteService.", e);
+        }
+
+        if (resposta == null || resposta.features == null || resposta.features.isEmpty()) {
+            log.info("OpenRouteService sem geometria de rota: origem={} destino={}", origem, destino);
+            return List.of();
+        }
+
+        double[][] coordenadas = resposta.features.get(0).geometry.coordinates;
+        if (coordenadas == null || coordenadas.length == 0) {
+            return List.of();
+        }
+
+        // GeoJSON vem [lng, lat]; o Leaflet espera [lat, lng].
+        List<double[]> geometria = new ArrayList<>(coordenadas.length);
+        for (double[] par : coordenadas) {
+            geometria.add(new double[]{par[1], par[0]});
+        }
+        log.info("Rota tracada: origem={} destino={} pontos={}", origem, destino, geometria.size());
+        return geometria;
+    }
+
     /**
      * Endereco -> [lng, lat] via geocoding do ORS. Sem correspondencia -> null
      * (rota inexistente, o front avisa "nao foi possivel tracar rota"). Falha
@@ -163,5 +212,12 @@ public class OpenRouteServiceGeoGateway implements GatewayGeo {
     private record RespostaGeocoding(List<Feature> features) {
         private record Feature(Geometria geometry) {}
         private record Geometria(double[] coordinates) {}
+    }
+
+    /** Directions API — variante /geojson: coordinates e uma LineString [[lng, lat], ...]. */
+    private record RequisicaoDirections(double[][] coordinates) {}
+    private record RespostaDirections(List<FeatureLinha> features) {
+        private record FeatureLinha(GeometriaLinha geometry) {}
+        private record GeometriaLinha(double[][] coordinates) {}
     }
 }

@@ -9,6 +9,7 @@ import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.Resumo;
 import com.jaasielsilva.transportmanager.features.carga.dto.CargaDtos.SalvarRequest;
 import com.jaasielsilva.transportmanager.features.carga.service.CargaService;
 import com.jaasielsilva.transportmanager.features.geo.dto.GeoDtos.EstimativaRota;
+import com.jaasielsilva.transportmanager.features.geo.dto.GeoDtos.MapaRota;
 import com.jaasielsilva.transportmanager.features.geo.service.GeoService;
 import com.jaasielsilva.transportmanager.features.platform.Modulo;
 import com.jaasielsilva.transportmanager.features.platform.RequiresModule;
@@ -54,10 +55,12 @@ public class CargaController {
     @GetMapping
     public ApiResponse<PageResponse<Resumo>> listar(
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) Long motoristaId,
+            @RequestParam(required = false) String status,
             @PageableDefault(size = 20, sort = "nome", direction = Sort.Direction.ASC)
             Pageable pageable) {
 
-        return ApiResponse.ok(service.listar(q, limitar(pageable)));
+        return ApiResponse.ok(service.listar(q, motoristaId, status, limitar(pageable)));
     }
 
     @GetMapping("/{id}")
@@ -103,6 +106,17 @@ public class CargaController {
                 montarOrigem(req), montarDestino(req)));
     }
 
+    /**
+     * Mapa da rota da carga ja salva: origem, destino e a geometria tracada
+     * pelo provedor (Directions API), para o componente Leaflet do front
+     * desenhar a linha entre os dois pontos.
+     */
+    @GetMapping("/{id}/rota-mapa")
+    public ApiResponse<MapaRota> rotaMapa(@PathVariable Long id) {
+        Detalhe carga = service.buscar(id);
+        return ApiResponse.ok(geoService.tracarRota(montarOrigem(carga), montarDestino(carga)));
+    }
+
     /** Exclusão é soft delete e só o admin do tenant faz. */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('TENANT_ADMIN')")
@@ -132,6 +146,14 @@ public class CargaController {
 
     private String montarDestino(CalcularRotaRequest req) {
         return montarEndereco(req.destinoEndereco(), req.destinoCidade(), req.destinoUf());
+    }
+
+    private String montarOrigem(Detalhe carga) {
+        return montarEndereco(carga.origemEndereco(), carga.origemCidade(), carga.origemUf());
+    }
+
+    private String montarDestino(Detalhe carga) {
+        return montarEndereco(carga.destinoEndereco(), carga.destinoCidade(), carga.destinoUf());
     }
 
     private String montarEndereco(String endereco, String cidade, String uf) {

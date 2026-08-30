@@ -8,6 +8,7 @@ import {
   CargaCalcularRota,
   CargaDetalhe,
   CargaEstimativaRota,
+  CargaMapaRota,
   CargaResumo,
   CargaSalvar,
   CepDados,
@@ -29,12 +30,19 @@ export class CargaService {
   private readonly http = inject(HttpClient);
   private readonly url = `${environment.apiUrl}/cargas`;
 
-  listar(q = '', page = 0, size = 20): Observable<PageResponse<CargaResumo>> {
-    const params = new HttpParams()
-      .set('q', q)
-      .set('page', page)
-      .set('size', size)
-      .set('sort', 'nome,asc');
+  listar(
+    q = '',
+    page = 0,
+    size = 20,
+    filtros?: { motoristaId?: number; status?: string },
+  ): Observable<PageResponse<CargaResumo>> {
+    let params = new HttpParams().set('q', q).set('page', page).set('size', size).set('sort', 'nome,asc');
+    if (filtros?.motoristaId != null) {
+      params = params.set('motoristaId', filtros.motoristaId);
+    }
+    if (filtros?.status) {
+      params = params.set('status', filtros.status);
+    }
 
     return this.http
       .get<ApiResponse<PageResponse<CargaResumo>>>(this.url, { params })
@@ -94,6 +102,16 @@ export class CargaService {
   buscarCep(cep: string): Observable<CepDados | null> {
     return this.http
       .get<ApiResponse<CepDados | null>>(`${environment.apiUrl}/ceps/${cep}`)
+      .pipe(map((r) => r.data));
+  }
+
+  /**
+   * Mapa da rota da carga ja salva (origem, destino, geometria) para o
+   * componente Leaflet embutido no formulario de detalhe.
+   */
+  rotaMapa(id: number): Observable<CargaMapaRota> {
+    return this.http
+      .get<ApiResponse<CargaMapaRota>>(`${this.url}/${id}/rota-mapa`)
       .pipe(map((r) => r.data));
   }
 }

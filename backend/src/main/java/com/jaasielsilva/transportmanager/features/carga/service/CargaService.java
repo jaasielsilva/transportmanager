@@ -62,8 +62,19 @@ public class CargaService {
      */
     @Transactional(readOnly = true)
     public PageResponse<Resumo> listar(String q, Pageable pageable) {
+        return listar(q, null, null, pageable);
+    }
+
+    /**
+     * motoristaId/status opcionais: usados por "Minhas entregas"
+     * (GET /cargas?motoristaId=X&status=EM_TRANSITO), sem endpoint proprio.
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<Resumo> listar(String q, Long motoristaId, String status, Pageable pageable) {
         String busca = q == null ? "" : q.trim();
-        return PageResponse.of(repository.buscar(busca, pageable), CargaMapper::paraResumo);
+        String statusNormalizado = status == null || status.isBlank() ? null : status.toUpperCase().trim();
+        return PageResponse.of(
+                repository.buscar(busca, motoristaId, statusNormalizado, pageable), CargaMapper::paraResumo);
     }
 
     @Transactional(readOnly = true)

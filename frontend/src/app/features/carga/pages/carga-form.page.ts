@@ -11,6 +11,9 @@ import {
 } from '../carga.status';
 import { CargaCalcularRota, CargaSalvar } from '../models/carga.model';
 import { CargaService } from '../services/carga.service';
+import { RotaMapaComponent } from '../components/rota-mapa.component';
+import { MotoristaResumo } from '../../motorista/models/motorista.model';
+import { MotoristaService } from '../../motorista/services/motorista.service';
 
 /**
  * Molde do kit — FORMULARIO DE REFERENCIA (criar e editar na mesma tela).
@@ -29,7 +32,7 @@ import { CargaService } from '../services/carga.service';
  */
 @Component({
   selector: 'app-carga-form',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, RotaMapaComponent],
   template: `
     <div class="barra-topo">
       <div>
@@ -76,6 +79,13 @@ import { CargaService } from '../services/carga.service';
       </div>
     }
 
+    @if (mostrarMapa()) {
+      <div class="card" style="max-width: 720px; margin-bottom: 12px">
+        <h2 style="margin-top: 0">Rota</h2>
+        <app-rota-mapa [cargaId]="id" [status]="status()" />
+      </div>
+    }
+
     <form class="card" style="max-width: 720px" [formGroup]="form" (ngSubmit)="salvar()">
       <h2>Identificacao</h2>
 
@@ -114,6 +124,22 @@ import { CargaService } from '../services/carga.service';
       </label>
 
       <h2>Transporte</h2>
+
+      <label class="campo">
+        <span>Motorista responsavel</span>
+        <select formControlName="motoristaId">
+          <option [ngValue]="null">Nenhum</option>
+          @for (motorista of motoristas(); track motorista.id) {
+            <option [ngValue]="motorista.id">{{ motorista.nome }}</option>
+          }
+        </select>
+        @if (motoristas().length === 0) {
+          <span class="texto-suave">
+            Nenhum motorista cadastrado ainda —
+            <a routerLink="/motoristas/novo">cadastre o primeiro</a>.
+          </span>
+        }
+      </label>
 
       <label class="campo">
         <span>CEP de origem @if (cepOrigemCarregando()) { <em class="texto-suave">· buscando...</em> }</span>
@@ -254,8 +280,9 @@ export class CargaFormPage {
   private readonly rota = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
+  private readonly motoristaService = inject(MotoristaService);
 
-  private readonly id = Number(this.rota.snapshot.paramMap.get('id'));
+  protected readonly id = Number(this.rota.snapshot.paramMap.get('id'));
 
   protected readonly salvando = signal(false);
   protected readonly calculandoRota = signal(false);
@@ -264,6 +291,18 @@ export class CargaFormPage {
   protected readonly cepDestinoCarregando = signal(false);
   protected readonly somenteLeitura = this.auth.somenteLeitura;
   protected readonly status = signal<string | null>(null);
+  private readonly motoristaId = signal<number | null>(null);
+  /** Opcoes do seletor "Motorista responsavel" — ate 100 ativos, mesmo teto de listagem do sistema. */
+  protected readonly motoristas = signal<MotoristaResumo[]>([]);
+
+  /**
+   * Mapa da rota so aparece quando ha o que mostrar: carga ja salva, com
+   * motorista atribuido e fora do rascunho inicial (PENDENTE sem motorista
+   * ainda nao tem rota nem posicao para desenhar).
+   */
+  protected readonly mostrarMapa = computed(
+    () => !this.ehNovo() && this.motoristaId() != null && this.status() !== 'PENDENTE',
+  );
 
   /** Transicoes validas a partir do status atual — espelha a regra do backend. */
   protected readonly transicoes = computed(() => {
@@ -281,6 +320,7 @@ export class CargaFormPage {
     documento: ['', [Validators.maxLength(20)]],
     observacao: ['', [Validators.maxLength(500)]],
     ativo: [true],
+    motoristaId: this.fb.control<number | null>(null),
     origemCep: ['', [Validators.maxLength(8)]],
     origemEndereco: ['', [Validators.maxLength(255)]],
     origemCidade: ['', [Validators.required, Validators.maxLength(100)]],
@@ -299,6 +339,10 @@ export class CargaFormPage {
   });
 
   constructor() {
+    this.motoristaService.listar('', 0, 100).subscribe((pagina) => {
+      this.motoristas.set(pagina.content.filter((m) => m.ativo));
+    });
+
     if (!this.ehNovo()) {
       this.service.buscar(this.id).subscribe((dados) => {
         this.form.patchValue({
@@ -308,6 +352,7 @@ export class CargaFormPage {
           documento: dados.documento ?? '',
           observacao: dados.observacao ?? '',
           ativo: dados.ativo,
+          motoristaId: dados.motoristaId,
           origemEndereco: dados.origemEndereco ?? '',
           origemCidade: dados.origemCidade ?? '',
           origemUf: dados.origemUf ?? '',
@@ -324,6 +369,7 @@ export class CargaFormPage {
             dados.tempoEstimadoMinutos != null ? String(dados.tempoEstimadoMinutos) : '',
         });
         this.status.set(dados.status);
+        this.motoristaId.set(dados.motoristaId);
         this.statusControle.setValue((STATUS_TRANSICOES[dados.status] ?? [])[0] ?? null);
       });
     }
@@ -533,7 +579,7 @@ export class CargaFormPage {
       peso: this.paraNumero(raw.peso),
       valorFrete: this.paraNumero(raw.valorFrete),
       status: null,
-      motoristaId: null,
+      motoristaId: raw.motoristaId,
       clienteId: null,
       dataColeta: this.deDatetimeLocal(raw.dataColeta),
       dataEntregaPrevista: this.deDatetimeLocal(raw.dataEntregaPrevista),

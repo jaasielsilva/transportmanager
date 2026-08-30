@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.jaasielsilva.transportmanager.exception.GatewayGeoException;
 import com.jaasielsilva.transportmanager.features.geo.GatewayGeo;
 import com.jaasielsilva.transportmanager.features.geo.dto.GeoDtos.EstimativaRota;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,5 +55,30 @@ class GeoServiceTest {
         assertThatThrownBy(() -> service.estimarRota("A", "B"))
                 .isInstanceOf(GatewayGeoException.class)
                 .hasMessageContaining("Google fora do ar.");
+    }
+
+    @Test
+    @DisplayName("tracarRota monta origem/destino a partir das pontas da geometria")
+    void tracarRotaMontaOrigemEDestino() {
+        when(gateway.tracar("Sao Paulo, Brasil", "Campinas, Brasil"))
+                .thenReturn(List.of(new double[]{-23.55, -46.63}, new double[]{-22.9, -47.06}));
+
+        var mapa = service.tracarRota("Sao Paulo, Brasil", "Campinas, Brasil");
+
+        assertThat(mapa.origem().lat()).isEqualTo(-23.55);
+        assertThat(mapa.destino().lat()).isEqualTo(-22.9);
+        assertThat(mapa.geometria()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("tracarRota sem geometria devolve origem/destino nulos, nao erro")
+    void tracarRotaSemGeometriaDevolveNulos() {
+        when(gateway.tracar("A", "B")).thenReturn(List.of());
+
+        var mapa = service.tracarRota("A", "B");
+
+        assertThat(mapa.origem()).isNull();
+        assertThat(mapa.destino()).isNull();
+        assertThat(mapa.geometria()).isEmpty();
     }
 }
