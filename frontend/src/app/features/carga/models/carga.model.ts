@@ -107,3 +107,20 @@ export interface CepDados {
   uf: string;
 }
 
+/** Ponto geografico simples — espelho de GeoDtos.PontoGeo. */
+export interface PontoGeo {
+  lat: number;
+  lng: number;
+}
+
+/**
+ * Saida do endpoint `GET /cargas/{id}/rota-mapa`: origem, destino e a
+ * geometria da rota (pares [lat, lng], ja na ordem que o Leaflet espera).
+ * origem/destino nulos e geometria vazia = sem rota tracavel.
+ */
+export interface CargaMapaRota {
+  origem: PontoGeo | null;
+  destino: PontoGeo | null;
+  geometria: [number, number][];
+}
+

@@ -60,6 +60,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(e.getMessage()));
     }
 
+    /** 403 — autenticado e com a role certa, mas sem posse do recurso (regra que depende do dado). */
+    @ExceptionHandler(AcessoNegadoException.class)
+    public ResponseEntity<ApiResponse<Void>> acessoNegadoNegocio(AcessoNegadoException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(e.getMessage()));
+    }
+
     /** 400 — Bean Validation nos DTOs de request. */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> validacao(MethodArgumentNotValidException e) {

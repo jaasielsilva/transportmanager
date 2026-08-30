@@ -72,6 +72,23 @@ export const routes: Routes = [
         canActivate: [assinaturaGuard, roleGuard('TENANT_ADMIN')],
         loadComponent: () => import('./features/equipe/equipe.page').then((m) => m.EquipePage),
       },
+      {
+        path: 'motoristas',
+        canActivate: [assinaturaGuard, moduloGuard('CADASTROS')],
+        loadChildren: () =>
+          import('./features/motorista/motorista.routes').then((m) => m.rotas),
+      },
+      // "Minhas entregas": tela do motorista logado para iniciar/ver o
+      // rastreamento das cargas dele. Sem roleGuard: qualquer USER ve, ja que
+      // e a tela dele (quem nao e motorista de nada so ve a lista vazia).
+      {
+        path: 'minhas-entregas',
+        canActivate: [assinaturaGuard, moduloGuard('OPERACAO')],
+        loadComponent: () =>
+          import('./features/rastreamento/pages/minhas-entregas.page').then(
+            (m) => m.MinhasEntregasPage,
+          ),
+      },
       // Sem guard nenhum alem do authGuard, de proposito: todo usuario
       // autenticado troca a propria senha, PLATFORM_ADMIN incluido. Sem
       // assinaturaGuard pelo mesmo motivo do /assinatura: o backend isenta

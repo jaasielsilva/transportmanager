@@ -36,6 +36,26 @@ public interface CargaRepository extends JpaRepository<Carga, Long> {
     Page<Carga> buscar(@Param("q") String q, Pageable pageable);
 
     /**
+     * Mesma busca, com motoristaId/status opcionais — usada por "Minhas
+     * entregas" (GET /cargas?motoristaId=X&status=EM_TRANSITO). ':motoristaId
+     * IS NULL OR' e ':status IS NULL OR' funcionam aqui porque os dois
+     * parametros tem tipo conhecido (Long/String), ao contrario do :q vazio.
+     */
+    @Query("""
+            SELECT r FROM Carga r
+             WHERE r.deletedAt IS NULL
+               AND (LOWER(r.nome)  LIKE LOWER(CONCAT('%', :q, '%'))
+                 OR LOWER(COALESCE(r.email, '')) LIKE LOWER(CONCAT('%', :q, '%'))
+                 OR COALESCE(r.documento, '')    LIKE CONCAT('%', :q, '%'))
+               AND (:motoristaId IS NULL OR r.motoristaId = :motoristaId)
+               AND (:status IS NULL OR r.status = :status)
+            """)
+    Page<Carga> buscar(@Param("q") String q,
+                        @Param("motoristaId") Long motoristaId,
+                        @Param("status") String status,
+                        Pageable pageable);
+
+    /**
      * Registro de outro tenant simplesmente nao e encontrado — o service
      * transforma isso em 404. E o comportamento correto: 403 confirmaria que o
      * id existe em alguma empresa.

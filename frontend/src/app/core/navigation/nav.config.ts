@@ -24,6 +24,15 @@ export interface ItemDeMenu {
 export const MENU: ItemDeMenu[] = [
   { rota: '/inicio', titulo: 'Inicio', icone: '■' },
   { rota: '/cargas', titulo: 'Cargas', icone: '●', modulo: 'CADASTROS' },
+  {
+    rota: '/motoristas',
+    titulo: 'Motoristas',
+    icone: '■',
+    modulo: 'CADASTROS',
+    roles: ['TENANT_ADMIN'],
+  },
+  // Sem `roles`: e a tela do motorista logado, qualquer USER autenticado ve.
+  { rota: '/minhas-entregas', titulo: 'Minhas entregas', icone: '▶', modulo: 'OPERACAO' },
   // Sem `roles` de proposito: e o unico item que serve a TODA role,
   // PLATFORM_ADMIN incluido — trocar a propria senha nao e privilegio de perfil.
   { rota: '/minha-conta', titulo: 'Minha conta', icone: '◐' },
