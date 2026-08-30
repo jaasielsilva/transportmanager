@@ -15,8 +15,8 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Roda como nao-root
 RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx \
- && sed -i 's|/var/run/nginx.pid|/tmp/nginx.pid|' /etc/nginx/nginx.conf \
- && sed -i '/user  nginx;/d' /etc/nginx/nginx.conf
+ && sed -i -E 's#^(\s*pid\s+).*#\1/tmp/nginx.pid;#' /etc/nginx/nginx.conf \
+ && sed -i -E '/^\s*user\s+/d' /etc/nginx/nginx.conf
 USER nginx
 
 EXPOSE 80
