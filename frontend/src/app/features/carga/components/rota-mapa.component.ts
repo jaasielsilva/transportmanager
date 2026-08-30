@@ -49,14 +49,14 @@ export class RotaMapaComponent {
 
   private inicializar(): void {
     this.mapa = L.map(this.elementoMapa().nativeElement).setView([-14.235, -51.9253], 4);
-    // CARTO Voyager em vez do tile padrao do OSM: gratuito, sem chave, e com
-    // visual mais limpo e colorido (ruas destacadas), parecido com o Google
-    // Maps — o cru do OSM padrao fica com aparencia mais "antiga"/mapa de papel.
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-      maxZoom: 20,
-      subdomains: 'abcd',
-    }).addTo(this.mapa);
+    // Esri World Street Map: gratuito e sem chave (ao contrario do CARTO, que
+    // passou a exigir conta/API key nos tiles anonimos), visual colorido com
+    // ruas destacadas — mais perto do Google Maps/Waze que o OSM cru.
+    // ATENCAO: servico Esri usa ordem {z}/{y}/{x}, diferente do XYZ padrao.
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      { attribution: 'Tiles &copy; Esri', maxZoom: 19 },
+    ).addTo(this.mapa);
 
     // O container pode nascer com tamanho ainda nao calculado pelo layout do
     // Angular (ex.: dentro de um @if) — sem isso o Leaflet as vezes desenha
